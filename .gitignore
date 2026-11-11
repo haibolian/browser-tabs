@@ -1,0 +1,7 @@
+node_modules/
+.pnpm-store/
+dist/
+artifacts/
+*.zip
+*.local
+*.tsbuildinfo

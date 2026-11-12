@@ -120,7 +120,7 @@ export function ClockSearch({
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           aria-label="搜索内容"
-          placeholder="搜索点什么，或去看看世界"
+          placeholder="搜索"
           className="h-full min-w-0 flex-1 bg-transparent px-3 text-[12px] text-foreground outline-none placeholder:text-muted-foreground"
         />
         <kbd className="mr-2 rounded border border-primary/10 px-1.5 py-0.5 text-[10px] text-muted-foreground group-focus-within:hidden">

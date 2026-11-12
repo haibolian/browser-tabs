@@ -114,10 +114,18 @@
 body {
   margin: 0;
   min-width: 360px;
+  -webkit-user-select: none;
+  user-select: none;
   background: var(--background);
   transition:
     background-color 0.25s,
     color 0.25s;
+}
+input,
+textarea,
+[contenteditable]:not([contenteditable='false']) {
+  -webkit-user-select: text;
+  user-select: text;
 }
 button,
 a,

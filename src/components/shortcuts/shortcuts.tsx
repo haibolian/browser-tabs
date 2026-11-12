@@ -176,9 +176,7 @@ export function Shortcuts({
               <FolderClosed size={22} style={{ color: folder?.color }} />
               {folder?.title}
             </DialogTitle>
-            <DialogDescription>
-              {folder?.items.length ?? 0} 个网站 · 把喜欢的放在一起
-            </DialogDescription>
+            <DialogDescription>{folder?.items.length ?? 0} 个网站</DialogDescription>
           </DialogHeader>
           {folder && (
             <IconGrid

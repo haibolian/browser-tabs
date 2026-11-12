@@ -3,7 +3,6 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   Check,
-  Feather,
   HardDrive,
   Settings2,
   Sun,
@@ -27,6 +26,9 @@ import type { Settings, Workspace, UpdateWorkspace } from '@/lib/workspace'
 import type { ColorMode, ResolvedTheme } from '@/lib/theme'
 import { IconSettings } from '@/components/shortcuts/icon-settings'
 import type { ImportedBackup } from '@/lib/infinity-backup'
+import { CloudBackupPanel } from '@/components/cloud-backup-panel'
+import type { CloudConnection } from '@/lib/cloud-api'
+import type { CloudUpload } from '@/hooks/use-cloud-upload'
 
 export function SettingsDialog({
   open,
@@ -37,6 +39,9 @@ export function SettingsDialog({
   imageUrl,
   resolvedTheme,
   onArrangeDesktop,
+  cloudConnection,
+  connectionError,
+  cloudUpload,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -46,6 +51,9 @@ export function SettingsDialog({
   imageUrl: string | null
   resolvedTheme: ResolvedTheme
   onArrangeDesktop: () => void
+  cloudConnection: CloudConnection | null
+  connectionError: string | null
+  cloudUpload: CloudUpload
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
@@ -85,26 +93,28 @@ export function SettingsDialog({
     {
       key: 'openInNewTab' as const,
       title: '在新标签页打开网站',
-      detail: '让这个小小的桌面一直在这里',
     },
-    { key: 'showSeconds' as const, title: '时钟显示秒数', detail: '看时间轻轻地流过' },
+    { key: 'showSeconds' as const, title: '时钟显示秒数' },
     {
       key: 'showWidgets' as const,
       title: '显示桌面小组件',
-      detail: '在图标网格中显示待办和随手记',
     },
-    { key: 'reducedMotion' as const, title: '减少动画', detail: '保留必要的反馈，减少位移与缩放' },
+    { key: 'reducedMotion' as const, title: '减少动画' },
   ]
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
-        <DialogContent position="right" overlay={false} className="settings-panel">
+        <DialogContent
+          position="right"
+          overlay={false}
+          className="settings-panel"
+          aria-describedby={undefined}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2.5">
               <Settings2 size={21} className="text-primary" />
               偏好设置
             </DialogTitle>
-            <DialogDescription>用你习惯的方式，打开新的一页。</DialogDescription>
           </DialogHeader>
           <Tabs defaultValue="general">
             <TabsList className="mb-1 w-full">
@@ -127,9 +137,6 @@ export function SettingsDialog({
                   <div key={option.key} className="flex items-center justify-between gap-5">
                     <label htmlFor={`setting-${option.key}`} className="cursor-pointer">
                       <span className="block text-[13px]">{option.title}</span>
-                      <span className="mt-1 block text-[10px] text-muted-foreground">
-                        {option.detail}
-                      </span>
                     </label>
                     <Switch
                       id={`setting-${option.key}`}
@@ -139,12 +146,7 @@ export function SettingsDialog({
                   </div>
                 ))}
                 <div className="flex items-center justify-between gap-5 border-t border-border pt-5">
-                  <div>
-                    <span className="block text-[13px]">整理桌面图标</span>
-                    <span className="mt-1 block text-[10px] text-muted-foreground">
-                      按当前窗口的槽位排列，可撤销
-                    </span>
-                  </div>
+                  <span className="text-[13px]">整理桌面图标</span>
                   <Button
                     variant="outline"
                     size="sm"
@@ -214,12 +216,9 @@ export function SettingsDialog({
               <div className="mb-4 mt-4">
                 <h3 className="flex items-center gap-2 text-xs font-medium">
                   <HardDrive size={14} className="text-primary/60" />
-                  你的数据，由你保管
+                  本地备份
                 </h3>
-                <p className="mb-4 mt-2 text-[11px] leading-6 text-muted-foreground">
-                  待办、备忘、网站和壁纸仅保存在当前浏览器。导出一份备份，就能在另一台设备上继续使用。
-                </p>
-                <div className="flex gap-2">
+                <div className="mt-4 flex gap-2">
                   <Button
                     variant="outline"
                     className="flex-1 text-xs"
@@ -251,20 +250,16 @@ export function SettingsDialog({
                     event.target.value = ''
                   }}
                 />
-                <p className="mt-3 text-[11px] leading-5 text-muted-foreground">
-                  支持留白 .json 和 Infinity v2 .infinity 备份，可迁移网站、分组、图标及随手记。
-                </p>
+                <CloudBackupPanel
+                  workspace={workspace}
+                  onRestore={setPendingImport}
+                  connection={cloudConnection}
+                  connectionError={connectionError}
+                  cloudUpload={cloudUpload}
+                />
               </div>
             </TabsContent>
           </Tabs>
-          <div className="mt-6 flex items-center gap-2 rounded-xl bg-primary/4 px-3 py-3 text-[10px] text-muted-foreground">
-            <Feather size={14} className="text-primary/65" />
-            <span>留白 1.0.0</span>
-            <span className="ml-auto flex items-center gap-1">
-              <Check size={12} />
-              本地存储，无需账号
-            </span>
-          </div>
         </DialogContent>
       </Dialog>
       <Dialog
@@ -278,9 +273,7 @@ export function SettingsDialog({
             <DialogTitle>
               {pendingImport?.source === 'infinity' ? '导入 Infinity 备份？' : '导入这份备份？'}
             </DialogTitle>
-            <DialogDescription>
-              当前内容会被备份替换。导入后可以通过提示中的「撤销」恢复。
-            </DialogDescription>
+            <DialogDescription>将替换当前桌面内容，可撤销。</DialogDescription>
           </DialogHeader>
           <div className="rounded-2xl bg-primary/5 p-4 text-sm">
             {pendingImport?.workspace.todos.length} 项待办 · {pendingImport?.workspace.notes.length}{' '}

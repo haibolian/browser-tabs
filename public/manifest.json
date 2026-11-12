@@ -1,11 +1,13 @@
 {
   "manifest_version": 3,
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtWp7C1BiMZuK91KCvG7aArjmQwcLmiH9AQuMlQX3Sal0mKJEMGOlQ4F3STeo91OyFOXKxgDzbvYPXq+P5wY/uhd0RZ8xnk9g9MLicOQgXT6V5mbn5Fi3H4vJS/sY//UI2kr0T0aCiZkoKuhCN5ipvHrPPqoqEP9IDftWqxRBFpJ93+lJf+PjU7mnUxdowA60Q4FzgHcWxDvITYm/IEqkRfxxTTZK1Em7YwenB2h2bQOs+oCFkiZaPnB7p7txmnP9WOS+ZBmswJoNMBIsoFG2TdDuaMSZH4GTIJJFbhk+1H0o6df7T+/1q7bznpgWHorqE9XhCKi0LHe1j4f5tH1ElQIDAQAB",
   "name": "留白 · 轻盈的新标签页",
   "short_name": "留白",
   "version": "1.0.0",
   "description": "把注意力留给重要的事。待办、备忘、网站分组与自定义壁纸，都在一个轻盈的新标签页。",
   "chrome_url_overrides": { "newtab": "index.html" },
   "background": { "service_worker": "background.js", "type": "module" },
+  "permissions": ["identity"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "icons": {
     "16": "icons/icon-16.png",

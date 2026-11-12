@@ -8,11 +8,7 @@ function IconImage({ url, onError }: { url: string; onError?: () => void }) {
   const [failed, setFailed] = useState(false)
   if (failed)
     return (
-      <span
-        className="icon-image-error"
-        title="图标加载失败，请编辑图标重新获取或使用文字图标"
-        aria-label="图标加载失败"
-      >
+      <span className="icon-image-error" title="图标加载失败" aria-label="图标加载失败">
         <ImageOff />
       </span>
     )
@@ -109,11 +105,7 @@ export function SiteIcon({
         image ? (
           <IconImage key={`${imageKey}:${image}`} url={image} onError={onImageError} />
         ) : (
-          <span
-            className="icon-image-error"
-            title="尚未选择图片，可获取网站图标、上传图片或使用文字图标"
-            aria-label="尚未选择图片"
-          >
+          <span className="icon-image-error" title="尚未选择图片" aria-label="尚未选择图片">
             <ImageOff />
           </span>
         )

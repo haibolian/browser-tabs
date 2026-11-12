@@ -10,6 +10,10 @@ import { Shortcuts } from '@/components/shortcuts/shortcuts'
 import { NotesDialog, NotesWidget } from '@/components/widgets/notes-widget'
 import { TodoDialog, TodoWidget } from '@/components/widgets/todo-widget'
 import { useWorkspace } from '@/hooks/use-workspace'
+import { useCloudConnection } from '@/hooks/use-cloud-connection'
+import { useCloudUpload, type CloudUpload } from '@/hooks/use-cloud-upload'
+import { CloudUploadStatus } from '@/components/cloud-upload-status'
+import type { CloudConnection } from '@/lib/cloud-api'
 import {
   createId,
   wallpapers,
@@ -32,7 +36,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
       return (
         <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-8 text-center">
           <CircleAlert className="text-destructive" />
-          <h1 className="text-lg font-medium">页面遇到了一点问题</h1>
+          <h1 className="text-lg font-medium">页面发生错误</h1>
           <p className="max-w-lg text-sm text-muted-foreground">{this.state.error.message}</p>
           <Button onClick={() => window.location.reload()}>重新加载</Button>
         </div>
@@ -95,6 +99,9 @@ function Desktop({
   saveError,
   retrySave,
   onImport,
+  cloudConnection,
+  connectionError,
+  cloudUpload,
 }: {
   workspace: Workspace
   update: UpdateWorkspace
@@ -102,6 +109,9 @@ function Desktop({
   saveError: string | null
   retrySave: () => void
   onImport: (workspace: Workspace) => void
+  cloudConnection: CloudConnection | null
+  connectionError: string | null
+  cloudUpload: CloudUpload
 }) {
   const [panel, setPanel] = useState<'todo' | 'notes' | 'settings' | null>(null)
   const arrangeRef = useRef<(() => void) | null>(null)
@@ -220,6 +230,21 @@ function Desktop({
             arrangeRef={arrangeRef}
             onSettings={() => setPanel('settings')}
           />
+          {cloudConnection && cloudUpload.state.phase !== 'idle' && (
+            <div className="mx-auto flex shrink-0 items-center gap-3 py-1">
+              <CloudUploadStatus state={cloudUpload.state} />
+              {cloudUpload.state.phase === 'error' && (
+                <>
+                  <Button variant="ghost" size="sm" onClick={cloudUpload.retry}>
+                    重试上传
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setPanel('settings')}>
+                    云端备份
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
         </main>
       </div>
       <TodoDialog
@@ -254,6 +279,9 @@ function Desktop({
         imageUrl={imageUrl}
         resolvedTheme={resolvedTheme}
         onArrangeDesktop={() => arrangeRef.current?.()}
+        cloudConnection={cloudConnection}
+        connectionError={connectionError}
+        cloudUpload={cloudUpload}
       />
       <Toaster
         position="bottom-center"
@@ -266,7 +294,10 @@ function Desktop({
 }
 
 export default function App() {
-  const { workspace, setWorkspace, loadError, saveError, saving, retrySave } = useWorkspace()
+  const { connection, error: connectionError } = useCloudConnection()
+  const { workspace, setWorkspace, loadError, saveError, saving, retrySave } =
+    useWorkspace(connection)
+  const cloudUpload = useCloudUpload(connection)
   const update: UpdateWorkspace = useCallback(
     (updater) => {
       setWorkspace((current) => (current ? updater(current) : current))
@@ -286,7 +317,7 @@ export default function App() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background">
         <Feather size={30} strokeWidth={1.2} className="animate-pulse text-primary/60" />
-        <span className="text-xs tracking-[.3em] text-primary/60">正在打开你的留白</span>
+        <span className="text-xs tracking-[.3em] text-primary/60">加载中…</span>
       </div>
     )
   return (
@@ -298,6 +329,9 @@ export default function App() {
         saveError={saveError}
         retrySave={retrySave}
         onImport={setWorkspace}
+        cloudConnection={connection}
+        connectionError={connectionError}
+        cloudUpload={cloudUpload}
       />
     </TooltipProvider>
   )

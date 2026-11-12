@@ -19,6 +19,39 @@ const entries = [
 ]
 
 describe('可定位的混合网格', () => {
+  it('两个小组件的 2×3 布局可保存恢复，在右下边界放置时不跨页或重叠', () => {
+    const size = widgetSizePresets.find((preset) => preset.id === '2x3')!
+    const workspace = createWorkspace()
+    workspace.widgetSizes = { todo: size.id, notes: size.id }
+    expect(workspaceSchema.parse(JSON.parse(JSON.stringify(workspace))).widgetSizes).toEqual({
+      todo: '2x3',
+      notes: '2x3',
+    })
+    const widgets = entries.map((entry) =>
+      ['todo', 'notes'].includes(entry.id)
+        ? { ...entry, columns: size.columns, rows: size.rows }
+        : entry,
+    )
+    const placed = arrangeDesktop(
+      widgets,
+      { todo: { column: 5, row: 2 }, notes: { column: 5, row: 2 } },
+      6,
+      'todo',
+      4,
+    )
+    expect(placed[0]).toMatchObject({ column: 4, row: 1, columns: 2, rows: 3 })
+    expect(
+      placed.every(
+        (entry) => entry.column + entry.columns <= 6 && (entry.row % 4) + entry.rows <= 4,
+      ),
+    ).toBe(true)
+    expect(
+      placed.every((entry, index) =>
+        placed.slice(index + 1).every((other) => !overlaps(entry, other)),
+      ),
+    ).toBe(true)
+    expect(arrangeDesktop(widgets, positionsFromLayout(placed), 6, undefined, 4)).toEqual(placed)
+  })
   it('小数像素取整不会丢掉刚好容纳的槽位，也不会多算不足一行的空间', () => {
     expect(getGridTrackCount(169.1979217529297, 60, 30, 19.2)).toBe(2)
     expect(getGridTrackCount(689.99, 60, 30)).toBe(8)

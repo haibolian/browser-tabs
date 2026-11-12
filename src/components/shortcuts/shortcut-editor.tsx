@@ -2,13 +2,7 @@ import { useCallback, useRef, useState, type ReactNode } from 'react'
 import { Check, FolderClosed, Globe2, Loader2, Plus, Type } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { useSiteDetails } from '@/hooks/use-site-details'
 import { initialIconText, readIconImage } from '@/lib/icon-appearance'
@@ -163,7 +157,7 @@ export function ShortcutEditor({
       if (!title.trim()) throw new Error('请输入网站名称')
       if (source === 'text' && !text.trim()) throw new Error('请输入图标文字')
       if (source === 'site' && !selectedFavicon)
-        throw new Error('尚未获取网站图标，请重新获取，或选择文字、上传图片、系统预设图标')
+        throw new Error('未获取网站图标，请重新获取或更换图标')
       if (source === 'upload' && !selectedUpload) throw new Error('请先上传一张图标图片')
       if (image && failedImage === image)
         throw new Error('选中的图片加载失败，请重新获取或选择其他图标')
@@ -194,12 +188,12 @@ export function ShortcutEditor({
         if (!open) onClose()
       }}
     >
-      <DialogContent className="icon-editor max-w-[740px] overflow-y-auto">
+      <DialogContent
+        className="icon-editor max-w-[740px] overflow-y-auto"
+        aria-describedby={undefined}
+      >
         <DialogHeader className="mb-4">
           <DialogTitle>{item ? '编辑图标' : '添加网站'}</DialogTitle>
-          <DialogDescription className="sr-only">
-            选择网站图片、文字或自己的图标。
-          </DialogDescription>
         </DialogHeader>
         <form
           className="space-y-3"
@@ -217,7 +211,6 @@ export function ShortcutEditor({
                   autoFocus
                   value={url}
                   inputMode="url"
-                  placeholder="https://example.com"
                   className="min-w-0 flex-1"
                   onChange={(event) => {
                     setUrl(event.target.value)
@@ -245,7 +238,6 @@ export function ShortcutEditor({
               网站名称
               <Input
                 value={title}
-                placeholder="例如：GitHub"
                 onChange={(event) => {
                   manualTitle.current = !!event.target.value
                   setTitle(event.target.value)
@@ -253,16 +245,18 @@ export function ShortcutEditor({
                 }}
               />
             </label>
-            <p
-              role="status"
-              className={cn(
-                'flex items-start gap-2 text-[11px] leading-5 text-muted-foreground',
-                siteDetails.status === 'error' && 'text-destructive',
-              )}
-            >
-              <Globe2 size={13} className="mt-0.5 shrink-0" />
-              {siteDetails.message || '输入网址后自动获取网站名称与图标。'}
-            </p>
+            {siteDetails.message && (
+              <p
+                role={siteDetails.status === 'error' ? 'alert' : 'status'}
+                className={cn(
+                  'flex items-start gap-2 text-[11px] leading-5 text-muted-foreground',
+                  siteDetails.status === 'error' && 'text-destructive',
+                )}
+              >
+                <Globe2 size={13} className="mt-0.5 shrink-0" />
+                {siteDetails.message}
+              </p>
+            )}
           </div>
           <div className="icon-editor-section space-y-3">
             <div className="flex flex-wrap items-start gap-3" role="group" aria-label="图标来源">
@@ -370,7 +364,6 @@ export function ShortcutEditor({
                 <Input
                   value={text}
                   disabled={choice !== 'text'}
-                  placeholder="例如：工作 / Work"
                   className="pl-9"
                   onChange={(event) => {
                     manualText.current = true

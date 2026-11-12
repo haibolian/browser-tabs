@@ -3,13 +3,7 @@ import { FolderClosed } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import {
   colors,
@@ -40,10 +34,9 @@ export function FolderEditor({
         if (!open) onClose()
       }}
     >
-      <DialogContent className="overflow-y-auto">
+      <DialogContent className="overflow-y-auto" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle>{item ? '编辑分组' : '新建分组'}</DialogTitle>
-          <DialogDescription>把常用网站放在一起。</DialogDescription>
         </DialogHeader>
         <form
           className="space-y-5"
@@ -82,12 +75,7 @@ export function FolderEditor({
           </div>
           <label className="form-label">
             分组名称
-            <Input
-              autoFocus
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              placeholder="例如：灵感收集"
-            />
+            <Input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} />
           </label>
           <fieldset>
             <legend className="mb-3 text-xs text-muted-foreground">分组颜色</legend>

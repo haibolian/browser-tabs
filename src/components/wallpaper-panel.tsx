@@ -41,7 +41,7 @@ export function WallpaperPanel({
         ...state,
         settings: { ...state.settings, imageId: id, wallpaper: 'uploaded' },
       }))
-      toast('壁纸已更换，图片仅保存在本机')
+      toast('壁纸已更换')
     } catch (error) {
       toast.error(`上传失败：${error instanceof Error ? error.message : '无法读取图片'}`)
     } finally {
@@ -53,10 +53,10 @@ export function WallpaperPanel({
       <Tabs defaultValue={initialTab}>
         <TabsList className="w-full">
           <TabsTrigger value="gradient" className="flex-1">
-            柔和渐变
+            渐变
           </TabsTrigger>
           <TabsTrigger value="solid" className="flex-1">
-            纯粹底色
+            纯色
           </TabsTrigger>
           <TabsTrigger value="upload" className="flex-1">
             我的图片
@@ -164,10 +164,7 @@ export function WallpaperPanel({
               <Upload size={20} strokeWidth={1.5} />
             </span>
             <span className="text-xs">
-              {uploading ? '正在保存图片…' : imageUrl ? '上传另一张图片' : '选择一张自己的图片'}
-            </span>
-            <span className="text-[10px] text-muted-foreground">
-              PNG、JPG、WebP、GIF、AVIF · 仅保存在本机
+              {uploading ? '正在保存图片…' : imageUrl ? '更换图片' : '上传图片'}
             </span>
           </button>
         </TabsContent>
@@ -197,7 +194,6 @@ export function WallpaperPanel({
           />
         </div>
       )}
-      <p className="mt-6 text-center text-[10px] text-muted-foreground">简单一点，也很好看。</p>
     </div>
   )
 }

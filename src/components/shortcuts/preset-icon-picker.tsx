@@ -43,7 +43,7 @@ export function PresetIconPicker({
         <Input
           type="search"
           aria-label="搜索系统预设图标"
-          placeholder="搜索图标，例如：日历 / calendar"
+          placeholder="搜索图标"
           className="pl-9 pr-10 [&::-webkit-search-cancel-button]:appearance-none"
           value={query}
           onChange={(event) => {
@@ -119,7 +119,7 @@ export function PresetIconPicker({
       </div>
       {results.length === 0 && (
         <div role="status" className="py-5 text-center text-xs text-muted-foreground">
-          没有找到匹配的图标，试试其他关键词或分类。
+          未找到图标
           <button
             type="button"
             className="ml-2 text-foreground underline underline-offset-4"

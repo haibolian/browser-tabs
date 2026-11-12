@@ -1,0 +1,24 @@
+[Unit]
+Description=Blank GitHub login and backup API
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=blank-backup
+Group=blank-backup
+WorkingDirectory=/opt/browser-tabs
+Environment=NODE_ENV=production
+EnvironmentFile=/etc/blank-backup.env
+ExecStart=/usr/bin/node /opt/browser-tabs/server-dist/index.js
+Restart=on-failure
+RestartSec=5
+StateDirectory=blank-backup
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

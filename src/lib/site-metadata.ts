@@ -47,8 +47,7 @@ export async function readSiteMetadata(
     if (!allowed)
       return {
         status: 'permission',
-        message:
-          '首次读取需要允许访问这个站点。点击「允许读取」，或手动填写名称并使用文字图标、上传图片或系统预设。',
+        message: '需要站点访问权限，请点击「允许读取」。',
       }
     const response = await chrome.runtime.sendMessage({ type: 'blank:read-site', url })
     if (!response?.ok) throw new Error(response?.error ?? '扩展未返回网站信息')

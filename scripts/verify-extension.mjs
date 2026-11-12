@@ -1,20 +1,45 @@
 import assert from 'node:assert/strict'
+import { createHash, createPublicKey } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { parseEnv } from 'node:util'
 import { unzipSync, strFromU8 } from 'fflate'
 
 const root = resolve(import.meta.dirname, '..')
 const manifest = JSON.parse(await readFile(resolve(root, 'dist/manifest.json'), 'utf8'))
 assert.equal(manifest.manifest_version, 3)
+const publicKey = createPublicKey({
+  key: Buffer.from(manifest.key, 'base64'),
+  format: 'der',
+  type: 'spki',
+})
+assert.equal(publicKey.asymmetricKeyType, 'rsa')
+const extensionId = [
+  ...createHash('sha256').update(Buffer.from(manifest.key, 'base64')).digest('hex').slice(0, 32),
+]
+  .map((character) => String.fromCharCode(97 + Number.parseInt(character, 16)))
+  .join('')
+assert.equal(
+  extensionId,
+  'nplbljhenhbjjccehgckeanlbiknanoe',
+  'Local extension identity must remain stable',
+)
+const serverExample = parseEnv(await readFile(resolve(root, '.env.server.example'), 'utf8'))
+assert.ok(
+  serverExample.GITHUB_RETURN_URLS.split(',').includes(
+    `https://${extensionId}.chromiumapp.org/github`,
+  ),
+  'Server configuration must allow the packaged extension callback',
+)
 assert.equal(manifest.chrome_url_overrides.newtab, 'index.html')
 assert.equal(
   manifest.content_security_policy.extension_pages,
   "script-src 'self'; object-src 'self'; base-uri 'self'",
 )
-assert.equal(
+assert.deepEqual(
   manifest.permissions,
-  undefined,
-  'This extension should not request browser permissions',
+  ['identity'],
+  'Only identity is needed for the GitHub OAuth window',
 )
 assert.ok(!manifest.host_permissions?.length, 'No host access is needed')
 assert.deepEqual(manifest.optional_host_permissions, ['http://*/*', 'https://*/*'])

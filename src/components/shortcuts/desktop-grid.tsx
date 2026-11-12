@@ -28,7 +28,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
@@ -227,10 +226,6 @@ function DraggableWidget({
               {size === preset.id && <Check className="text-primary" />}
             </DropdownMenuItem>
           ))}
-          <DropdownMenuSeparator />
-          <div className="px-3 py-1.5 text-[10px] text-muted-foreground">
-            拖动卡片头部可移动位置
-          </div>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
@@ -482,7 +477,7 @@ export function DesktopGrid({
         true,
       )
       setPageIndex(0)
-      toast('已按槽位自动整理', {
+      toast('桌面已整理', {
         action: { label: '撤销', onClick: () => onPositionsChange(layoutKey, previous, true) },
       })
     }

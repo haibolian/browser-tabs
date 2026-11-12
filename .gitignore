@@ -3,5 +3,9 @@ node_modules/
 dist/
 artifacts/
 *.zip
+browser-tabs-server.tar.gz
 *.local
 *.tsbuildinfo
+server/data/
+server-dist/
+.env.server

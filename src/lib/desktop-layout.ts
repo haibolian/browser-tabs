@@ -1,5 +1,6 @@
 export const widgetSizePresets = [
   { id: '2x2', label: '紧凑', columns: 2, rows: 2 },
+  { id: '2x3', label: '竖向', columns: 2, rows: 3 },
   { id: '3x2', label: '横向', columns: 3, rows: 2 },
   { id: '3x3', label: '方形', columns: 3, rows: 3 },
   { id: '4x2', label: '宽幅', columns: 4, rows: 2 },

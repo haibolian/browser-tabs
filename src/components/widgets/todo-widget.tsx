@@ -2,7 +2,6 @@ import { useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import {
   ArrowDownLeft,
-  Check,
   CheckCheck,
   CheckSquare2,
   Maximize2,
@@ -14,13 +13,7 @@ import {
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -103,7 +96,6 @@ function TodoList({
                     item.id === todo.id ? { ...item, done: checked === true } : item,
                   ),
                 }))
-                if (checked) toast('又完成一件小事', { icon: <Check size={15} />, duration: 1800 })
               }}
               aria-label={`完成待办：${todo.text}`}
             />
@@ -127,7 +119,7 @@ function TodoList({
                   if (event.key === 'Enter' && !event.nativeEvent.isComposing)
                     document.getElementById(expanded ? 'todo-draft-dialog' : 'todo-draft')?.focus()
                 }}
-                placeholder="写下这件事…"
+                placeholder="待办内容"
               />
             </div>
             <button
@@ -144,7 +136,7 @@ function TodoList({
             <span className="flex size-10 items-center justify-center rounded-2xl bg-primary/6 text-primary/60">
               <CheckCheck size={21} />
             </span>
-            <p className="text-xs">清空思绪，从一件小事开始</p>
+            <p className="text-xs">暂无待办</p>
           </div>
         )}
       </div>
@@ -162,7 +154,7 @@ function TodoList({
           aria-label={expanded ? '在弹窗添加待办' : '添加待办'}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
-          placeholder={expanded ? '添加一件小事，按 Enter 保存' : '添加待办…'}
+          placeholder="添加待办"
           className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
         />
         <button
@@ -180,13 +172,7 @@ function TodoList({
           expanded ? 'flex' : 'hidden',
         )}
       >
-        <span>
-          {remaining
-            ? `慢慢来，还有 ${remaining} 件小事`
-            : todos.length
-              ? '今天的事，都好好完成了'
-              : '今天，也可以从容一点'}
-        </span>
+        <span>未完成 {remaining} 项</span>
         <span className="flex items-center gap-2 tabular-nums">
           <span className="h-1 w-14 overflow-hidden rounded-full bg-primary/7">
             <motion.span
@@ -285,13 +271,12 @@ export function TodoDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl">
+      <DialogContent className="max-w-xl" aria-describedby={undefined}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2.5">
             <CheckSquare2 size={21} className="text-primary" />
             待办清单
           </DialogTitle>
-          <DialogDescription>一件一件来，把注意力留给当下。点击文字即可编辑。</DialogDescription>
         </DialogHeader>
         <TodoList todos={workspace.todos} update={update} expanded />
       </DialogContent>

@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { createWorkspace, type Workspace } from '@/lib/workspace'
 import { loadWorkspace, saveWorkspace } from '@/lib/storage'
+import { cloudUploadTarget, type CloudConnection } from '@/lib/cloud-api'
 
-export function useWorkspace() {
+export function useWorkspace(connection: CloudConnection | null) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [savedWorkspace, setSavedWorkspace] = useState<Workspace | null>(null)
   const [retry, setRetry] = useState(0)
   const revision = useRef(0)
+  const previousWorkspace = useRef<Workspace | null>(null)
+  const pendingChange = useRef<Workspace | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -29,10 +32,19 @@ export function useWorkspace() {
 
   useEffect(() => {
     if (!workspace) return
+    if (
+      previousWorkspace.current &&
+      JSON.stringify(previousWorkspace.current) !== JSON.stringify(workspace)
+    )
+      pendingChange.current = workspace
+    previousWorkspace.current = workspace
     const current = ++revision.current
-    saveWorkspace(workspace)
+    const target =
+      pendingChange.current === workspace && connection ? cloudUploadTarget(connection) : undefined
+    saveWorkspace(workspace, target)
       .then(() => {
         if (revision.current === current) {
+          if (pendingChange.current === workspace) pendingChange.current = null
           setSaveError(null)
           setSavedWorkspace(workspace)
         }
@@ -40,7 +52,7 @@ export function useWorkspace() {
       .catch((error: Error) => {
         if (revision.current === current) setSaveError(`保存失败：${error.message}`)
       })
-  }, [workspace, retry])
+  }, [workspace, retry, connection])
 
   const saving = workspace !== savedWorkspace && !saveError
 

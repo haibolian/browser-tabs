@@ -55,17 +55,15 @@ export function useSiteDetails(
         setStatus('success')
         setMessage(
           result.metadata.title && result.metadata.favicon
-            ? '已读取网站名称和图标，可继续修改'
+            ? ''
             : !result.metadata.favicon
-              ? '未找到网站图标，可以使用文字图标、上传图片或选择系统预设'
+              ? '未找到网站图标，请选择其他图标'
               : '未找到网站名称，请手动填写',
         )
       } catch (error) {
         if (current !== revision.current) return
         setStatus('error')
-        setMessage(
-          `读取失败：${error instanceof Error ? error.message : '无法读取这个网站'}。可以重试，或手动填写并使用文字图标、上传图片或系统预设。`,
-        )
+        setMessage(`读取失败：${error instanceof Error ? error.message : '无法读取这个网站'}`)
       } finally {
         if (current === revision.current) pendingUrl.current = null
       }

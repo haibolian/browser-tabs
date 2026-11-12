@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { ArrowUpRight, FileText, Plus, StickyNote, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Tip } from '@/components/ui/tooltip'
 import type { Note, Workspace, UpdateWorkspace } from '@/lib/workspace'
 import { cn } from '@/lib/utils'
@@ -75,9 +75,7 @@ export function NotesWidget({
                     {dateLabel(note.updatedAt)}
                   </span>
                 </div>
-                <p className="sr-only">
-                  {note.content.replace(/\n/g, ' ') || '写一点什么，让想法有处安放…'}
-                </p>
+                <p className="sr-only">{note.content.replace(/\n/g, ' ') || '无内容'}</p>
               </div>
               <ArrowUpRight
                 size={13}
@@ -86,13 +84,10 @@ export function NotesWidget({
             </button>
           ))}
         {notes.length === 0 && (
-          <button
-            onClick={onNew}
-            className="notes-empty flex h-full min-h-32 w-full flex-col items-center justify-center gap-2 rounded-xl text-muted-foreground transition-colors hover:bg-surface-hover/30"
-          >
+          <div className="notes-empty flex h-full min-h-32 w-full flex-col items-center justify-center gap-2 text-muted-foreground">
             <FileText size={24} strokeWidth={1.3} className="text-note-accent/70" />
-            <span className="text-xs">有想法，就记下来</span>
-          </button>
+            <span className="text-xs">暂无备忘</span>
+          </div>
         )}
       </div>
       <button
@@ -100,7 +95,7 @@ export function NotesWidget({
         className="mt-2 flex h-8 shrink-0 items-center gap-2 rounded-xl border border-dashed border-note-accent/30 px-3 text-xs text-muted-foreground transition-all hover:border-note-accent/60 hover:bg-surface-hover/50 hover:text-foreground"
       >
         <Plus size={14} />
-        <span>写一条备忘</span>
+        <span>新建备忘</span>
       </button>
     </WidgetCard>
   )
@@ -154,10 +149,12 @@ export function NotesDialog({
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="h-[650px] max-w-[880px] gap-0 p-0 max-sm:h-[85dvh]">
+      <DialogContent
+        className="h-[650px] max-w-[880px] gap-0 p-0 max-sm:h-[85dvh]"
+        aria-describedby={undefined}
+      >
         <div className="sr-only">
           <DialogTitle>随手记</DialogTitle>
-          <DialogDescription>选择备忘录并编辑，内容自动保存在本机。</DialogDescription>
         </div>
         <div className="flex min-h-0 flex-1 max-sm:flex-col">
           <aside className="flex w-[220px] shrink-0 flex-col border-r border-border/70 bg-muted/50 p-4 max-sm:h-36 max-sm:w-full max-sm:border-b max-sm:border-r-0">
@@ -190,13 +187,13 @@ export function NotesDialog({
                   >
                     <div className="truncate text-xs font-medium">{note.title || '无标题备忘'}</div>
                     <div className="mt-1.5 truncate text-[10px] text-muted-foreground">
-                      {note.content.slice(0, 28) || '还没有内容'}
+                      {note.content.slice(0, 28) || '无内容'}
                     </div>
                   </button>
                 ))}
             </div>
             <span className="px-2 pt-3 text-[10px] text-muted-foreground max-sm:hidden">
-              {workspace.notes.length} 篇备忘 · 只属于你
+              {workspace.notes.length} 篇备忘
             </span>
           </aside>
           <div className="flex min-h-0 min-w-0 flex-1 flex-col px-8 pb-5 pt-14 max-sm:px-5 max-sm:pt-5">
@@ -228,7 +225,7 @@ export function NotesDialog({
                     aria-label="备忘录正文"
                     value={selected.content}
                     onChange={(event) => changeNote({ content: event.target.value })}
-                    placeholder="把想到的，都留在这里…"
+                    placeholder="正文"
                     className="task-scroll min-h-20 flex-1 resize-none bg-transparent text-[13px] leading-[2] text-foreground outline-none placeholder:text-muted-foreground"
                   />
                   <div className="mt-4 flex items-center justify-between border-t border-border/60 pt-3">
@@ -243,7 +240,7 @@ export function NotesDialog({
                         ? '保存失败，请关闭弹窗后重试保存'
                         : saving
                           ? '正在保存…'
-                          : '已自动保存到本机'}
+                          : '已保存到本机'}
                     </span>
                     <Tip label="删除这篇备忘">
                       <Button
@@ -262,10 +259,9 @@ export function NotesDialog({
             ) : (
               <div className="flex flex-1 flex-col items-center justify-center gap-4 text-muted-foreground">
                 <StickyNote size={36} strokeWidth={1} />
-                <p className="text-sm">这里，留给你的想法</p>
                 <Button variant="secondary" onClick={onNew}>
                   <Plus size={15} />
-                  写第一篇备忘
+                  新建备忘
                 </Button>
               </div>
             )}

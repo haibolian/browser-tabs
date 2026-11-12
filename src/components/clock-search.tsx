@@ -48,14 +48,14 @@ export function ClockSearch({
       initial={{ opacity: 0, y: -12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-      className="clock-section flex flex-col items-center pb-9 pt-0 text-center"
+      className="clock-section flex shrink-0 flex-col items-center pb-9 pt-0 text-center"
     >
       <div
-        className="clock-face relative flex items-center justify-center font-light leading-[1.17] tracking-[-.065em] text-desktop-foreground"
+        className="clock-face relative flex items-center justify-center leading-[1.17] text-desktop-foreground"
         aria-label={`现在时间 ${hours}:${minutes}`}
       >
         <span>{hours}</span>
-        <span className="clock-colon -mt-2 px-1 font-extralight text-primary/50">:</span>
+        <span className="clock-colon px-1">:</span>
         <span>{minutes}</span>
         {workspace.settings.showSeconds && (
           <span className="ml-3 self-end pb-5 text-[27px] tracking-normal text-desktop-muted">
@@ -63,7 +63,7 @@ export function ClockSearch({
           </span>
         )}
       </div>
-      <div className="mt-2 flex items-center gap-3 text-[11px] tracking-[.08em] text-desktop-muted">
+      <div className="mt-2 flex items-center gap-1 text-[14px] tracking-[.08em] text-desktop-muted">
         <span>{now.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })}</span>
         <span className="size-[3px] rounded-full bg-primary/30" />
         <span>{now.toLocaleDateString('zh-CN', { weekday: 'long' })}</span>
@@ -78,7 +78,7 @@ export function ClockSearch({
             else window.location.assign(url)
           }
         }}
-        className="search-bar group mt-6 flex h-[50px] w-full max-w-[580px] items-center rounded-[18px] border border-surface-border/70 bg-card/75 px-2 shadow-[0_6px_30px_-12px_#0000000a] backdrop-blur-lg transition-all duration-300 focus-within:-translate-y-0.5 focus-within:bg-surface/95 focus-within:shadow-[0_10px_40px_-12px_#00000014]"
+        className="search-bar group mt-6 flex h-[50px] w-full max-w-[580px] items-center rounded-[18px] border border-surface-border/70 bg-card/85 px-2 shadow-[0_6px_30px_-12px_#0000000a] transition-[background-color,box-shadow,transform] duration-300 focus-within:-translate-y-0.5 focus-within:bg-surface/95 focus-within:shadow-[0_10px_40px_-12px_#00000014]"
       >
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -90,7 +90,7 @@ export function ClockSearch({
               <span className="w-4 text-center font-serif text-lg font-bold text-primary/80">
                 {engine.letter}
               </span>
-              <ChevronDown size={10} className="text-muted-foreground/60" />
+              <ChevronDown size={10} className="text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
@@ -121,9 +121,9 @@ export function ClockSearch({
           onChange={(event) => setQuery(event.target.value)}
           aria-label="搜索内容"
           placeholder="搜索点什么，或去看看世界"
-          className="h-full min-w-0 flex-1 bg-transparent px-3 text-[12px] text-foreground outline-none placeholder:text-muted-foreground/65"
+          className="h-full min-w-0 flex-1 bg-transparent px-3 text-[12px] text-foreground outline-none placeholder:text-muted-foreground"
         />
-        <kbd className="mr-2 rounded border border-primary/10 px-1.5 py-0.5 text-[10px] text-muted-foreground/50 group-focus-within:hidden">
+        <kbd className="mr-2 rounded border border-primary/10 px-1.5 py-0.5 text-[10px] text-muted-foreground group-focus-within:hidden">
           /
         </kbd>
         <button

@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
 import { fetchSitePage } from '../src/lib/fetch-site-page'
+import { siteRequestError } from '../src/lib/site-request-error'
 
 async function metadataHandler(
   request: IncomingMessage,
@@ -20,7 +21,7 @@ async function metadataHandler(
   } catch (error) {
     console.error('Site metadata request failed:', error)
     response.statusCode = 422
-    response.end(JSON.stringify({ error: error instanceof Error ? error.message : '读取网站失败' }))
+    response.end(JSON.stringify({ error: siteRequestError(error) }))
   }
 }
 

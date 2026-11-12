@@ -1,34 +1,8 @@
-import {
-  BookOpen,
-  Code2,
-  Coffee,
-  Figma,
-  Github,
-  Globe2,
-  Mail,
-  Music2,
-  PenTool,
-  Sparkles,
-  TvMinimal,
-  ImageOff,
-} from 'lucide-react'
+import { ImageOff } from 'lucide-react'
 import { useLayoutEffect, useRef, useState } from 'react'
 import type { Shortcut } from '@/lib/workspace'
 import { cn } from '@/lib/utils'
-
-const icons = {
-  globe: Globe2,
-  github: Github,
-  figma: Figma,
-  video: TvMinimal,
-  sparkles: Sparkles,
-  code: Code2,
-  book: BookOpen,
-  mail: Mail,
-  coffee: Coffee,
-  design: PenTool,
-  music: Music2,
-}
+import { presetIconComponents } from './preset-icons'
 
 function IconImage({ url, onError }: { url: string; onError?: () => void }) {
   const [failed, setFailed] = useState(false)
@@ -107,7 +81,7 @@ export function SiteIcon({
   onImageError?: () => void
   imageKey?: number
 }) {
-  const Icon = site.icon === 'notion' ? null : icons[site.icon]
+  const Icon = site.icon === 'notion' ? null : presetIconComponents[site.icon]
   const preset = !site.iconSource || site.iconSource === 'preset'
   const image = site.iconSource === 'upload' ? site.uploadedIcon : site.favicon
   return (

@@ -1,5 +1,4 @@
 import { useContext, type ReactNode, type SyntheticEvent } from 'react'
-import { motion } from 'motion/react'
 import { cn } from '@/lib/utils'
 import { WidgetDragContext } from './widget-drag-context'
 
@@ -28,26 +27,15 @@ export function WidgetHeader({ children, className }: { children: ReactNode; cla
   )
 }
 
-export function WidgetCard({
-  children,
-  className,
-  index = 0,
-}: {
-  children: ReactNode
-  className?: string
-  index?: number
-}) {
+export function WidgetCard({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 18 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ type: 'spring', stiffness: 220, damping: 26, delay: 0.12 + index * 0.07 }}
+    <section
       className={cn(
-        'widget-card flex min-w-0 flex-col rounded-[19px] border border-surface-border/75 bg-card/75 p-4 backdrop-blur-xl',
+        'widget-card flex min-w-0 flex-col rounded-[19px] border border-surface-border/75 bg-card/85 p-4',
         className,
       )}
     >
       {children}
-    </motion.section>
+    </section>
   )
 }

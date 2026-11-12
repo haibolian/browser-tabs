@@ -42,7 +42,7 @@
   --secondary: #f5f5f5;
   --secondary-foreground: #262626;
   --muted: #f5f5f5;
-  --muted-foreground: #737373;
+  --muted-foreground: #595959;
   --border: #e5e5e5;
   --input: #d4d4d4;
   --ring: #a3a3a3;
@@ -58,12 +58,12 @@
   --overlay: #00000033;
   --todo-accent: #525252;
   --todo-surface: #f5f5f5;
-  --note-accent: #737373;
+  --note-accent: #595959;
   --note-surface: #f5f5f5;
   --switch-track: #d4d4d4;
   --switch-thumb: #ffffff;
-  --desktop-foreground: #262626;
-  --desktop-muted: #737373;
+  --desktop-foreground: #171717;
+  --desktop-muted: #525252;
   --icon-tint: #fff;
   --icon-tint-amount: 0%;
   --widget-shadow: 0 8px 40px -18px #00000012, inset 0 1px 0 #ffffffb3;
@@ -84,7 +84,7 @@
   --secondary: #1a1a1a;
   --secondary-foreground: #e5e5e5;
   --muted: #171717;
-  --muted-foreground: #a3a3a3;
+  --muted-foreground: #bfbfbf;
   --border: #2b2b2b;
   --input: #404040;
   --ring: #737373;
@@ -104,8 +104,8 @@
   --note-surface: #262626;
   --switch-track: #404040;
   --switch-thumb: #f5f5f5;
-  --desktop-foreground: #f5f5f5;
-  --desktop-muted: #a3a3a3;
+  --desktop-foreground: #fafafa;
+  --desktop-muted: #c2c2c2;
   --icon-tint-amount: 45%;
   --widget-shadow: 0 8px 40px -18px #0005, inset 0 1px 0 #ffffff08;
   --widget-hover-shadow: 0 12px 42px -20px #0009, inset 0 1px 0 #ffffff12;
@@ -144,12 +144,12 @@ a:focus-visible {
   isolation: isolate;
 }
 .dark-wallpaper {
-  --desktop-foreground: #fffffff2;
-  --desktop-muted: #ffffffb3;
+  --desktop-foreground: #ffffff;
+  --desktop-muted: #ffffffeb;
 }
 .light-wallpaper {
-  --desktop-foreground: #262626;
-  --desktop-muted: #636363;
+  --desktop-foreground: #171717;
+  --desktop-muted: #4b4b4b;
 }
 .dark-wallpaper .clock-face,
 .dark-wallpaper .tile-label {
@@ -159,7 +159,7 @@ a:focus-visible {
   color: var(--desktop-foreground);
 }
 .clock-colon {
-  color: var(--desktop-muted);
+  color: inherit;
 }
 .site-icon {
   position: relative;
@@ -230,8 +230,7 @@ a:focus-visible {
   line-height: 1;
   transform-origin: center;
 }
-.site-label,
-.action-label {
+.site-label {
   position: absolute;
   top: 100%;
   left: 50%;
@@ -247,15 +246,8 @@ a:focus-visible {
   color: var(--site-name-color, var(--desktop-foreground));
   transform: translateX(-50%);
 }
-.action-icon {
-  width: var(--site-icon-size, 60px);
-  height: var(--site-icon-size, 60px);
-  border-radius: var(--site-icon-radius, 18px);
-  opacity: var(--site-icon-opacity, 1);
-}
 .folder-icon {
-  background: color-mix(in srgb, var(--surface) 60%, transparent);
-  backdrop-filter: blur(10px);
+  background: color-mix(in srgb, var(--surface) 75%, transparent);
   overflow: hidden;
   opacity: var(--site-icon-opacity, 1);
   box-shadow:
@@ -361,18 +353,17 @@ a:focus-visible {
 }
 .clock-face {
   font-size: 76px;
-  font-variant-numeric: tabular-nums;
-  font-family: 'Segoe UI Variable Display', 'Segoe UI', sans-serif;
-}
-.clock-colon {
-  animation: breathe 4s ease-in-out infinite;
+  font-variant-numeric: lining-nums tabular-nums;
+  font-family: inherit;
+  font-weight: 500;
+  letter-spacing: -0.035em;
 }
 .widget-card {
   box-shadow: var(--widget-shadow);
   transition:
     box-shadow 0.4s,
     border-color 0.4s,
-    background 0.4s;
+    background-color 0.4s;
 }
 .widget-card:hover {
   box-shadow: var(--widget-hover-shadow);
@@ -389,6 +380,39 @@ a:focus-visible {
 }
 .desktop-grid {
   isolation: isolate;
+}
+.desktop-grid[data-sorting='true'] .slot-cell {
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--site-name-color, var(--foreground)) 16%, transparent);
+}
+.grid-pagination {
+  color: var(--desktop-muted);
+}
+.folder-panel .grid-pagination {
+  color: var(--muted-foreground);
+}
+.grid-page-button {
+  display: flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  transition: background-color 0.15s;
+}
+.grid-page-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+.grid-page-button:disabled {
+  cursor: default;
+  opacity: 0.3;
+}
+.slot-viewport .drop-folder .folder-icon {
+  transform: none;
+}
+[data-dragging='true'] .site-launch > span > span:first-child {
+  transform: none;
+  transition: none;
 }
 .desktop-widget {
   height: 100%;
@@ -511,7 +535,7 @@ a:focus-visible {
   transition:
     transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1.2),
     box-shadow 0.35s,
-    background 0.35s;
+    background-color 0.35s;
 }
 .site-launch:hover > span > span:first-child {
   transform: translateY(-5px) scale(1.045);
@@ -547,16 +571,16 @@ a:focus-visible {
   background: color-mix(in srgb, var(--primary) 25%, transparent);
 }
 .dialog-overlay[data-state='open'] {
-  animation: fade-in 0.24s ease-out;
+  animation: fade-in 0.15s ease-out;
 }
 .dialog-overlay[data-state='closed'] {
-  animation: fade-out 0.2s ease-in;
+  animation: fade-out 0.1s ease-in forwards;
 }
 .dialog-content[data-state='open'] {
-  animation: dialog-in 0.38s cubic-bezier(0.18, 0.8, 0.22, 1);
+  animation: fade-in 0.15s ease-out;
 }
 .dialog-content[data-state='closed'] {
-  animation: dialog-out 0.2s ease-in;
+  animation: fade-out 0.1s ease-in forwards;
 }
 .menu-content[data-state='open'] {
   animation: menu-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -582,15 +606,6 @@ a:focus-visible {
   color: var(--primary-foreground) !important;
 }
 
-@keyframes breathe {
-  0%,
-  100% {
-    opacity: 0.8;
-  }
-  50% {
-    opacity: 0.4;
-  }
-}
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -605,26 +620,6 @@ a:focus-visible {
   }
   to {
     opacity: 0;
-  }
-}
-@keyframes dialog-in {
-  from {
-    opacity: 0;
-    transform: translateY(14px) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-@keyframes dialog-out {
-  from {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(8px) scale(0.98);
   }
 }
 @keyframes menu-in {
@@ -646,32 +641,6 @@ a:focus-visible {
     opacity: 1;
     transform: scale(1);
   }
-}
-@keyframes settings-in {
-  from {
-    opacity: 0;
-    transform: translateX(40px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-@keyframes settings-out {
-  from {
-    opacity: 1;
-    transform: translateX(0);
-  }
-  to {
-    opacity: 0;
-    transform: translateX(30px);
-  }
-}
-.settings-panel[data-state='open'] {
-  animation: settings-in 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-.settings-panel[data-state='closed'] {
-  animation: settings-out 0.22s ease-in;
 }
 
 @media (min-height: 900px) {

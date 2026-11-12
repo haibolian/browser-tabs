@@ -1,6 +1,6 @@
-import { Component, useCallback, useEffect, useState, type ReactNode } from 'react'
+import { Component, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, MotionConfig, motion } from 'motion/react'
-import { Check, CircleAlert, CloudOff, Feather, Loader2 } from 'lucide-react'
+import { CircleAlert, CloudOff, Feather } from 'lucide-react'
 import { Toaster } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -104,6 +104,7 @@ function Desktop({
   onImport: (workspace: Workspace) => void
 }) {
   const [panel, setPanel] = useState<'todo' | 'notes' | 'settings' | null>(null)
+  const arrangeRef = useRef<(() => void) | null>(null)
   const resolvedTheme = useTheme(workspace.settings.theme)
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
   const { imageUrl, imageBrightness, imageError } = useWallpaperImage(workspace.settings.imageId)
@@ -154,7 +155,7 @@ function Desktop({
       <div
         style={iconAppearanceStyle(workspace.settings.icons)}
         className={cn(
-          'desktop relative flex min-h-screen flex-col overflow-x-clip',
+          'desktop relative flex h-dvh min-h-0 flex-col overflow-hidden',
           workspace.settings.wallpaper === 'uploaded' &&
             imageBrightness !== null &&
             (imageBrightness * (1 - workspace.settings.imageDim / 100) < 0.5
@@ -194,7 +195,7 @@ function Desktop({
         )}
         <main
           style={{ maxWidth: Math.max(1220, workspace.settings.icons.maxWidth + 80) }}
-          className="mx-auto w-full flex-1 px-10 pb-10 pt-5 max-sm:px-5"
+          className="mx-auto flex min-h-0 w-full flex-1 flex-col px-10 pb-3 pt-5 max-sm:px-5"
         >
           {(saveError || imageError) && (
             <div
@@ -216,33 +217,10 @@ function Desktop({
             workspace={workspace}
             update={update}
             widgets={widgets}
+            arrangeRef={arrangeRef}
             onSettings={() => setPanel('settings')}
           />
         </main>
-        <footer className="flex flex-col items-center justify-center gap-2 pb-6 text-[10px] text-desktop-muted/80">
-          <span className="flex items-center gap-1.5 tracking-[.12em]">
-            <Feather size={12} strokeWidth={1.2} />
-            少一点纷扰，多一点专注。
-          </span>
-          <span role="status" className="flex items-center gap-1 text-[9px] text-desktop-muted/70">
-            {saveError ? (
-              <>
-                <CircleAlert size={10} />
-                尚未保存
-              </>
-            ) : saving ? (
-              <>
-                <Loader2 size={9} className="animate-spin" />
-                保存中
-              </>
-            ) : (
-              <>
-                <Check size={10} />
-                已保存在本机
-              </>
-            )}
-          </span>
-        </footer>
       </div>
       <TodoDialog
         open={panel === 'todo'}
@@ -275,6 +253,7 @@ function Desktop({
         onImport={onImport}
         imageUrl={imageUrl}
         resolvedTheme={resolvedTheme}
+        onArrangeDesktop={() => arrangeRef.current?.()}
       />
       <Toaster
         position="bottom-center"

@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { motion } from 'motion/react'
 import {
   ArrowDownLeft,
   Check,
@@ -86,81 +86,66 @@ function TodoList({
           expanded ? 'max-h-[47dvh] min-h-36' : 'h-[66px] shrink-0',
         )}
       >
-        <AnimatePresence initial={false} mode="popLayout">
-          {todos.map((todo) => (
-            <motion.div
-              key={todo.id}
-              layout
-              initial={{ opacity: 0, x: -8, height: 0 }}
-              animate={{ opacity: 1, x: 0, height: 'auto' }}
-              exit={{ opacity: 0, x: 15, height: 0 }}
-              transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-              className={cn(
-                'group flex items-center gap-2.5 rounded-lg px-1 transition-colors hover:bg-primary/3',
-                expanded ? 'min-h-11 py-1' : 'min-h-[33px]',
-              )}
-            >
-              <Checkbox
-                checked={todo.done}
-                onCheckedChange={(checked) => {
+        {todos.map((todo) => (
+          <div
+            key={todo.id}
+            className={cn(
+              'group flex items-center gap-2.5 rounded-lg px-1 transition-colors hover:bg-primary/3',
+              expanded ? 'min-h-11 py-1' : 'min-h-[33px]',
+            )}
+          >
+            <Checkbox
+              checked={todo.done}
+              onCheckedChange={(checked) => {
+                update((state) => ({
+                  ...state,
+                  todos: state.todos.map((item) =>
+                    item.id === todo.id ? { ...item, done: checked === true } : item,
+                  ),
+                }))
+                if (checked) toast('又完成一件小事', { icon: <Check size={15} />, duration: 1800 })
+              }}
+              aria-label={`完成待办：${todo.text}`}
+            />
+            <div className="relative min-w-0 flex-1">
+              <input
+                aria-label={`编辑待办：${todo.text}`}
+                className={cn(
+                  'w-full border-0 bg-transparent py-1.5 text-xs outline-none transition-colors placeholder:text-muted-foreground',
+                  todo.done && 'text-muted-foreground line-through decoration-muted-foreground/40',
+                )}
+                value={todo.text}
+                onChange={(event) =>
                   update((state) => ({
                     ...state,
                     todos: state.todos.map((item) =>
-                      item.id === todo.id ? { ...item, done: checked === true } : item,
+                      item.id === todo.id ? { ...item, text: event.target.value } : item,
                     ),
                   }))
-                  if (checked)
-                    toast('又完成一件小事', { icon: <Check size={15} />, duration: 1800 })
+                }
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.nativeEvent.isComposing)
+                    document.getElementById(expanded ? 'todo-draft-dialog' : 'todo-draft')?.focus()
                 }}
-                aria-label={`完成待办：${todo.text}`}
+                placeholder="写下这件事…"
               />
-              <div className="relative min-w-0 flex-1">
-                <input
-                  aria-label={`编辑待办：${todo.text}`}
-                  className={cn(
-                    'w-full border-0 bg-transparent py-1.5 text-xs outline-none transition-colors placeholder:text-muted-foreground/50',
-                    todo.done &&
-                      'text-muted-foreground/65 line-through decoration-muted-foreground/40',
-                  )}
-                  value={todo.text}
-                  onChange={(event) =>
-                    update((state) => ({
-                      ...state,
-                      todos: state.todos.map((item) =>
-                        item.id === todo.id ? { ...item, text: event.target.value } : item,
-                      ),
-                    }))
-                  }
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' && !event.nativeEvent.isComposing)
-                      document
-                        .getElementById(expanded ? 'todo-draft-dialog' : 'todo-draft')
-                        ?.focus()
-                  }}
-                  placeholder="写下这件事…"
-                />
-              </div>
-              <button
-                className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground/60 opacity-0 transition-all hover:bg-destructive/8 hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
-                aria-label={`删除待办：${todo.text}`}
-                onClick={() => removeTodo(todo)}
-              >
-                <X size={13} />
-              </button>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+            </div>
+            <button
+              className="flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-0 transition-all hover:bg-destructive/8 hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100"
+              aria-label={`删除待办：${todo.text}`}
+              onClick={() => removeTodo(todo)}
+            >
+              <X size={13} />
+            </button>
+          </div>
+        ))}
         {todos.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="todo-empty flex h-full min-h-32 flex-col items-center justify-center gap-2 py-5 text-muted-foreground"
-          >
+          <div className="todo-empty flex h-full min-h-32 flex-col items-center justify-center gap-2 py-5 text-muted-foreground">
             <span className="flex size-10 items-center justify-center rounded-2xl bg-primary/6 text-primary/60">
               <CheckCheck size={21} />
             </span>
             <p className="text-xs">清空思绪，从一件小事开始</p>
-          </motion.div>
+          </div>
         )}
       </div>
       <form
@@ -178,7 +163,7 @@ function TodoList({
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           placeholder={expanded ? '添加一件小事，按 Enter 保存' : '添加待办…'}
-          className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground/65"
+          className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
         />
         <button
           type="submit"
@@ -191,7 +176,7 @@ function TodoList({
       </form>
       <div
         className={cn(
-          'mt-4 shrink-0 items-center justify-between text-[10px] text-muted-foreground/75',
+          'mt-4 shrink-0 items-center justify-between text-[10px] text-muted-foreground',
           expanded ? 'flex' : 'hidden',
         )}
       >

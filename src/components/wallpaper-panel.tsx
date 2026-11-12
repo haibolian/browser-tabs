@@ -166,7 +166,7 @@ export function WallpaperPanel({
             <span className="text-xs">
               {uploading ? '正在保存图片…' : imageUrl ? '上传另一张图片' : '选择一张自己的图片'}
             </span>
-            <span className="text-[10px] text-muted-foreground/60">
+            <span className="text-[10px] text-muted-foreground">
               PNG、JPG、WebP、GIF、AVIF · 仅保存在本机
             </span>
           </button>
@@ -197,7 +197,7 @@ export function WallpaperPanel({
           />
         </div>
       )}
-      <p className="mt-6 text-center text-[10px] text-muted-foreground/55">简单一点，也很好看。</p>
+      <p className="mt-6 text-center text-[10px] text-muted-foreground">简单一点，也很好看。</p>
     </div>
   )
 }

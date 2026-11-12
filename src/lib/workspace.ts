@@ -2,22 +2,9 @@ import { z } from 'zod'
 import { isSiteIconUrl } from './site-metadata'
 import { colorModes, type ResolvedTheme } from './theme'
 import { iconAppearanceSchema, iconBackgroundSchema } from './icon-appearance'
-import { iconSizePresets } from './desktop-layout'
+import { iconSizePresets, widgetSizePresets } from './desktop-layout'
+import { iconNames } from './icon-presets'
 
-export const iconNames = [
-  'globe',
-  'github',
-  'figma',
-  'notion',
-  'video',
-  'sparkles',
-  'code',
-  'book',
-  'mail',
-  'coffee',
-  'design',
-  'music',
-] as const
 export const colors = [
   '#406956',
   '#6688b7',
@@ -84,11 +71,26 @@ export const workspaceSchema = z
         z.object({ column: z.number().int().min(0), row: z.number().int().min(0) }),
       )
       .default({}),
+    gridLayouts: z
+      .record(
+        z.string(),
+        z.record(
+          z.string().regex(/^[1-9]\d*x[1-9]\d*$/),
+          z.record(
+            z.string(),
+            z.object({
+              column: z.number().int().min(0),
+              row: z.number().int().min(0),
+            }),
+          ),
+        ),
+      )
+      .default({}),
     iconSizes: z.record(z.string(), z.enum(iconSizePresets.map((size) => size.id))).default({}),
     widgetSizes: z
       .object({
-        todo: z.enum(['2x2', '3x2', '4x2', '4x3']),
-        notes: z.enum(['2x2', '3x2', '4x2', '4x3']),
+        todo: z.enum(widgetSizePresets.map((size) => size.id)),
+        notes: z.enum(widgetSizePresets.map((size) => size.id)),
       })
       .default({ todo: '2x2', notes: '2x2' }),
     settings: z
@@ -175,6 +177,7 @@ export function createWorkspace(): Workspace {
     version: 1,
     desktopOrder: [],
     desktopPositions: {},
+    gridLayouts: {},
     iconSizes: {},
     widgetSizes: { todo: '2x2', notes: '2x2' },
     todos: [

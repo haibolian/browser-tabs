@@ -2,7 +2,10 @@ import { z } from 'zod'
 import type { CSSProperties } from 'react'
 
 export const iconColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/)
-export const iconBackgroundSchema = z.union([iconColorSchema, z.literal('transparent')])
+export const iconBackgroundSchema = z.union([
+  z.string().regex(/^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/),
+  z.literal('transparent'),
+])
 export const iconAppearanceSchema = z.object({
   shape: z.enum(['rounded', 'circle']).default('rounded'),
   size: z.number().min(50).max(100).default(60),
@@ -47,6 +50,13 @@ export function iconAppearanceStyle(settings: IconAppearance): CSSProperties {
     '--site-name-size': `${settings.nameSize}px`,
     '--site-name-display': settings.showName ? 'block' : 'none',
     '--site-name-color': settings.nameColor ?? 'var(--desktop-foreground)',
+  } as CSSProperties
+}
+
+export function folderAppearanceStyle(settings: IconAppearance): CSSProperties {
+  return {
+    ...iconAppearanceStyle(settings),
+    '--site-name-color': 'var(--foreground)',
   } as CSSProperties
 }
 

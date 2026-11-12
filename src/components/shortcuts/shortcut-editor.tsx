@@ -16,7 +16,6 @@ import type { SiteMetadata } from '@/lib/site-metadata'
 import {
   colors,
   createId,
-  iconNames,
   normalizeUrl,
   upsertShortcut,
   type Shortcut,
@@ -26,6 +25,7 @@ import {
 import { cn } from '@/lib/utils'
 import { IconColorPicker } from './icon-color-picker'
 import { SiteIcon, type SiteIconData } from './site-icon'
+import { PresetIconPicker } from './preset-icon-picker'
 
 type IconChoice = 'current' | Shortcut['iconSource']
 
@@ -197,7 +197,9 @@ export function ShortcutEditor({
       <DialogContent className="icon-editor max-w-[740px] overflow-y-auto">
         <DialogHeader className="mb-4">
           <DialogTitle>{item ? '编辑图标' : '添加网站'}</DialogTitle>
-          <DialogDescription className="sr-only">选择网站图片、文字或自己的图标。</DialogDescription>
+          <DialogDescription className="sr-only">
+            选择网站图片、文字或自己的图标。
+          </DialogDescription>
         </DialogHeader>
         <form
           className="space-y-3"
@@ -378,32 +380,7 @@ export function ShortcutEditor({
               </span>
             </label>
             {choice === 'preset' && (
-              <fieldset>
-                <legend className="mb-3 text-xs text-muted-foreground">系统预设图标</legend>
-                <div className="flex flex-wrap gap-2">
-                  {iconNames.map((name) => (
-                    <button
-                      type="button"
-                      key={name}
-                      aria-label={`选择图标 ${name}`}
-                      aria-pressed={icon === name}
-                      className={cn(
-                        'flex size-10 items-center justify-center rounded-xl border transition-colors',
-                        icon === name
-                          ? 'border-foreground bg-primary/8'
-                          : 'border-border hover:bg-surface-hover',
-                      )}
-                      onClick={() => setIcon(name)}
-                    >
-                      <SiteIcon
-                        site={{ icon: name, color }}
-                        mini
-                        className="!size-7 !bg-transparent [&_svg]:!size-5"
-                      />
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
+              <PresetIconPicker value={icon} color={color} onChange={setIcon} />
             )}
             <fieldset>
               <legend className="mb-3 text-xs text-muted-foreground">

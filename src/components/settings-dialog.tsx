@@ -26,6 +26,7 @@ import { exportWorkspace, importWorkspace } from '@/lib/storage'
 import type { Settings, Workspace, UpdateWorkspace } from '@/lib/workspace'
 import type { ColorMode, ResolvedTheme } from '@/lib/theme'
 import { IconSettings } from '@/components/shortcuts/icon-settings'
+import type { ImportedBackup } from '@/lib/infinity-backup'
 
 export function SettingsDialog({
   open,
@@ -35,6 +36,7 @@ export function SettingsDialog({
   onImport,
   imageUrl,
   resolvedTheme,
+  onArrangeDesktop,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -43,10 +45,11 @@ export function SettingsDialog({
   onImport: (workspace: Workspace) => void
   imageUrl: string | null
   resolvedTheme: ResolvedTheme
+  onArrangeDesktop: () => void
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
-  const [pendingImport, setPendingImport] = useState<Workspace | null>(null)
+  const [pendingImport, setPendingImport] = useState<ImportedBackup | null>(null)
   const set = (
     key: keyof Pick<Settings, 'openInNewTab' | 'showSeconds' | 'showWidgets' | 'reducedMotion'>,
     value: boolean,
@@ -71,7 +74,7 @@ export function SettingsDialog({
   async function readBackup(file: File) {
     setBusy(true)
     try {
-      setPendingImport(await importWorkspace(await file.text()))
+      setPendingImport(await importWorkspace(await file.text(), workspace.settings))
     } catch (error) {
       toast.error(`导入失败：${error instanceof Error ? error.message : '文件格式不正确'}`)
     } finally {
@@ -94,11 +97,8 @@ export function SettingsDialog({
   ]
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent
-          style={{ left: 'auto', right: 0, top: 0, translate: 'none' }}
-          className="settings-panel h-dvh max-h-dvh w-full max-w-[560px] overflow-y-auto rounded-none rounded-l-[24px]"
-        >
+      <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
+        <DialogContent position="right" overlay={false} className="settings-panel">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2.5">
               <Settings2 size={21} className="text-primary" />
@@ -127,7 +127,7 @@ export function SettingsDialog({
                   <div key={option.key} className="flex items-center justify-between gap-5">
                     <label htmlFor={`setting-${option.key}`} className="cursor-pointer">
                       <span className="block text-[13px]">{option.title}</span>
-                      <span className="mt-1 block text-[10px] text-muted-foreground/70">
+                      <span className="mt-1 block text-[10px] text-muted-foreground">
                         {option.detail}
                       </span>
                     </label>
@@ -138,6 +138,24 @@ export function SettingsDialog({
                     />
                   </div>
                 ))}
+                <div className="flex items-center justify-between gap-5 border-t border-border pt-5">
+                  <div>
+                    <span className="block text-[13px]">整理桌面图标</span>
+                    <span className="mt-1 block text-[10px] text-muted-foreground">
+                      按当前窗口的槽位排列，可撤销
+                    </span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      onArrangeDesktop()
+                      onOpenChange(false)
+                    }}
+                  >
+                    整理
+                  </Button>
+                </div>
               </div>
             </TabsContent>
             <TabsContent value="wallpaper">
@@ -224,7 +242,7 @@ export function SettingsDialog({
                 <input
                   ref={inputRef}
                   type="file"
-                  accept="application/json,.json"
+                  accept="application/json,.json,.infinity"
                   aria-label="导入备份文件"
                   className="hidden"
                   onChange={(event) => {
@@ -233,6 +251,9 @@ export function SettingsDialog({
                     event.target.value = ''
                   }}
                 />
+                <p className="mt-3 text-[11px] leading-5 text-muted-foreground">
+                  支持留白 .json 和 Infinity v2 .infinity 备份，可迁移网站、分组、图标及随手记。
+                </p>
               </div>
             </TabsContent>
           </Tabs>
@@ -254,15 +275,30 @@ export function SettingsDialog({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>导入这份备份？</DialogTitle>
+            <DialogTitle>
+              {pendingImport?.source === 'infinity' ? '导入 Infinity 备份？' : '导入这份备份？'}
+            </DialogTitle>
             <DialogDescription>
               当前内容会被备份替换。导入后可以通过提示中的「撤销」恢复。
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-2xl bg-primary/5 p-4 text-sm">
-            {pendingImport?.todos.length} 项待办 · {pendingImport?.notes.length} 篇备忘 ·{' '}
-            {pendingImport?.items.length} 个桌面图标
+            {pendingImport?.workspace.todos.length} 项待办 · {pendingImport?.workspace.notes.length}{' '}
+            篇备忘 ·{' '}
+            {pendingImport?.workspace.items.reduce(
+              (count, item) => count + (item.kind === 'folder' ? item.items.length : 1),
+              0,
+            )}{' '}
+            个网站 ·{' '}
+            {pendingImport?.workspace.items.filter((item) => item.kind === 'folder').length} 个分组
           </div>
+          {!!pendingImport?.notices.length && (
+            <ul className="mt-3 list-disc space-y-1 pl-4 text-xs leading-5 text-muted-foreground">
+              {pendingImport.notices.map((notice) => (
+                <li key={notice}>{notice}</li>
+              ))}
+            </ul>
+          )}
           <div className="mt-6 flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setPendingImport(null)}>
               取消
@@ -271,9 +307,11 @@ export function SettingsDialog({
               onClick={() => {
                 if (pendingImport) {
                   const previous = workspace
-                  onImport(pendingImport)
+                  onImport(pendingImport.workspace)
                   setPendingImport(null)
+                  onOpenChange(false)
                   toast('备份已导入', {
+                    duration: 8000,
                     action: { label: '撤销', onClick: () => onImport(previous) },
                   })
                 }

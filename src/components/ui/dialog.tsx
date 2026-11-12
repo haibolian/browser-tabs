@@ -10,14 +10,24 @@ export const DialogClose = DialogPrimitive.Close
 export function DialogContent({
   className,
   children,
+  overlay = true,
+  position = 'center',
   ...props
-}: ComponentProps<typeof DialogPrimitive.Content>) {
+}: ComponentProps<typeof DialogPrimitive.Content> & {
+  overlay?: boolean
+  position?: 'center' | 'right'
+}) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className="dialog-overlay fixed inset-0 z-50 bg-overlay" />
+      {overlay && (
+        <DialogPrimitive.Overlay className="dialog-overlay fixed inset-0 z-50 bg-overlay" />
+      )}
       <DialogPrimitive.Content
         className={cn(
-          'dialog-content fixed left-1/2 top-1/2 z-50 flex max-h-[88dvh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[26px] border border-surface-border/60 bg-surface p-7 shadow-[0_30px_120px_-20px_#00000040] outline-none',
+          'dialog-content fixed z-50 flex flex-col overflow-hidden bg-surface p-7 outline-none',
+          position === 'center'
+            ? 'left-1/2 top-1/2 max-h-[88dvh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-[26px] border border-surface-border/60 shadow-[0_30px_120px_-20px_#00000040]'
+            : 'inset-y-0 right-0 h-dvh w-full max-w-[560px] overflow-y-auto rounded-l-[24px] border-l border-surface-border',
           className,
         )}
         {...props}

@@ -1,5 +1,6 @@
 import { openDB } from 'idb'
-import { workspaceSchema, type Workspace } from './workspace'
+import { workspaceSchema, type Settings, type Workspace } from './workspace'
+import { importInfinityBackup, type ImportedBackup } from './infinity-backup'
 
 const database = openDB('blank-new-tab', 1, {
   upgrade(db) {
@@ -44,10 +45,11 @@ export async function exportWorkspace(workspace: Workspace) {
   )
 }
 
-export async function importWorkspace(raw: string): Promise<Workspace> {
+export async function importWorkspace(raw: string, settings?: Settings): Promise<ImportedBackup> {
   const parsed = JSON.parse(raw)
-  if (parsed.format !== 'blank-backup' || parsed.version !== 1)
-    throw new Error('这不是有效的留白备份文件')
+  if (parsed?.version === 'v2' && parsed?.data?.site) return importInfinityBackup(parsed, settings)
+  if (parsed?.format !== 'blank-backup' || parsed?.version !== 1)
+    throw new Error('请选择有效的留白或 Infinity v2 备份文件')
   const workspace = workspaceSchema.parse(parsed.workspace)
   if (workspace.settings.imageId) {
     if (
@@ -60,5 +62,5 @@ export async function importWorkspace(raw: string): Promise<Workspace> {
     await saveImage(imageId, image)
     workspace.settings.imageId = imageId
   }
-  return workspace
+  return { workspace, source: 'blank', notices: [] }
 }

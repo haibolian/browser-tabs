@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type RefObject } from 'react'
 import { motion } from 'motion/react'
 import { FolderClosed, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
@@ -20,7 +20,8 @@ import {
   type Workspace,
   type UpdateWorkspace,
 } from '@/lib/workspace'
-import { iconAppearanceStyle } from '@/lib/icon-appearance'
+import { folderAppearanceStyle } from '@/lib/icon-appearance'
+import type { GridPositions } from '@/lib/desktop-layout'
 import { IconGrid, type DesktopWidget } from './icon-grid'
 import { ShortcutEditor } from './shortcut-editor'
 import { FolderEditor } from './folder-editor'
@@ -35,13 +36,16 @@ export function Shortcuts({
   update,
   widgets,
   onSettings,
+  arrangeRef,
 }: {
   workspace: Workspace
   update: UpdateWorkspace
   widgets: DesktopWidget[]
   onSettings: () => void
+  arrangeRef: RefObject<(() => void) | null>
 }) {
   const [folderId, setFolderId] = useState<string | null>(null)
+  const [folderOpen, setFolderOpen] = useState(false)
   const [editor, setEditor] = useState<EditorState>(null)
   const folder = workspace.items.find(
     (item): item is Folder => item.id === folderId && item.kind === 'folder',
@@ -77,7 +81,7 @@ export function Shortcuts({
   }
   function ungroup(id: string) {
     update((state) => ({ ...state, items: ungroupFolder(state.items, id) }))
-    setFolderId(null)
+    setFolderOpen(false)
     toast('分组已解散，网站已移回桌面')
   }
   const handlers = {
@@ -86,7 +90,48 @@ export function Shortcuts({
     onEdit: edit,
     onDelete: remove,
     onUngroup: ungroup,
-    onOpenFolder: setFolderId,
+    onOpenFolder: (id: string) => {
+      setFolderId(id)
+      setFolderOpen(true)
+    },
+  }
+
+  function saveLayout(gridId: string, key: string, positions: GridPositions, moved = false) {
+    update((state) => {
+      if (!moved && state.gridLayouts[gridId]?.[key]) return state
+      const next = withLayout(state, gridId, key, positions)
+      if (!moved || gridId === 'desktop') return next
+      return {
+        ...next,
+        items: next.items.map((item) =>
+          item.kind === 'folder' && `folder:${item.id}` === gridId
+            ? {
+                ...item,
+                items: [...item.items].sort(
+                  (a, b) =>
+                    (positions[a.id]?.row ?? 0) - (positions[b.id]?.row ?? 0) ||
+                    (positions[a.id]?.column ?? 0) - (positions[b.id]?.column ?? 0),
+                ),
+              }
+            : item,
+        ),
+      }
+    })
+  }
+
+  function withLayout(
+    state: Workspace,
+    gridId: string,
+    key: string,
+    positions: GridPositions,
+  ): Workspace {
+    return {
+      ...state,
+      gridLayouts: {
+        ...state.gridLayouts,
+        [gridId]: { ...state.gridLayouts[gridId], [key]: positions },
+      },
+    }
   }
 
   return (
@@ -95,7 +140,7 @@ export function Shortcuts({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.25, duration: 0.5 }}
-      className="mx-auto w-full scroll-mt-8"
+      className="mx-auto flex min-h-0 w-full flex-1 flex-col"
       style={{ maxWidth: workspace.settings.icons.maxWidth }}
       aria-label="网站与小组件"
     >
@@ -103,41 +148,30 @@ export function Shortcuts({
         {...handlers}
         items={workspace.items}
         widgets={widgets}
+        arrangeRef={arrangeRef}
         onSettings={onSettings}
-        onPositionsChange={(positions) =>
+        onPositionsChange={(key, positions, moved) => saveLayout('desktop', key, positions, moved)}
+        onWidgetSizeChange={(key, size, layoutKey, positions) =>
           update((state) => ({
-            ...state,
-            desktopPositions: { ...state.desktopPositions, ...positions },
-          }))
-        }
-        onWidgetSizeChange={(key, size, positions) =>
-          update((state) => ({
-            ...state,
+            ...withLayout(state, 'desktop', layoutKey, positions),
             widgetSizes: { ...state.widgetSizes, [key]: size },
-            desktopPositions: { ...state.desktopPositions, ...positions },
           }))
         }
-        onIconSizeChange={(id, size, positions) =>
+        onIconSizeChange={(id, size, layoutKey, positions) =>
           update((state) => ({
-            ...state,
+            ...withLayout(state, 'desktop', layoutKey, positions),
             iconSizes: { ...state.iconSizes, [id]: size },
-            desktopPositions: { ...state.desktopPositions, ...positions },
           }))
         }
         onAdd={() => setEditor({ kind: 'shortcut', item: null, parentId: null })}
         onNewFolder={() => setEditor({ kind: 'folder', item: null })}
       />
-      <Dialog
-        open={!!folder}
-        onOpenChange={(open) => {
-          if (!open) setFolderId(null)
-        }}
-      >
+      <Dialog open={folderOpen && !!folder} onOpenChange={setFolderOpen}>
         <DialogContent
-          style={iconAppearanceStyle(workspace.settings.icons)}
-          className="folder-panel max-w-[820px] overflow-y-auto bg-surface/90"
+          style={folderAppearanceStyle(workspace.settings.icons)}
+          className="folder-panel max-w-[820px] overflow-hidden bg-surface/95 text-foreground"
         >
-          <DialogHeader>
+          <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2.5">
               <FolderClosed size={22} style={{ color: folder?.color }} />
               {folder?.title}
@@ -151,29 +185,25 @@ export function Shortcuts({
               {...handlers}
               items={folder.items}
               folderId={folder.id}
-              onReorder={(items) =>
-                update((state) => ({
-                  ...state,
-                  items: state.items.map((item) =>
-                    item.id === folder.id && item.kind === 'folder'
-                      ? { ...item, items: items as Shortcut[] }
-                      : item,
-                  ),
-                }))
+              onPositionsChange={(key, positions, moved) =>
+                saveLayout(`folder:${folder.id}`, key, positions, moved)
               }
               onAdd={() => setEditor({ kind: 'shortcut', item: null, parentId: folder.id })}
-              onResizeIcon={(id, size) =>
-                update((state) => ({ ...state, iconSizes: { ...state.iconSizes, [id]: size } }))
+              onIconSizeChange={(id, size, key, positions) =>
+                update((state) => ({
+                  ...withLayout(state, `folder:${folder.id}`, key, positions),
+                  iconSizes: { ...state.iconSizes, [id]: size },
+                }))
               }
             />
           )}
           {folder && (
-            <div className="mt-6 flex items-center justify-between border-t border-border/60 pt-4">
+            <div className="mt-3 flex shrink-0 items-center justify-between border-t border-border/60 pt-3">
               <Button variant="ghost" size="sm" onClick={() => edit(folder)}>
                 <Pencil className="!size-3" />
                 编辑分组
               </Button>
-              <span className="text-[10px] text-muted-foreground/60">右键图标可编辑或移出</span>
+              <span className="text-[10px] text-muted-foreground">右键图标可编辑或移出</span>
             </div>
           )}
         </DialogContent>

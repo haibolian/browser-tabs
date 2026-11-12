@@ -1,7 +1,14 @@
-import { useEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type CSSProperties,
+  type RefObject,
+} from 'react'
 import {
   DndContext,
-  DragOverlay,
   KeyboardSensor,
   MouseSensor,
   TouchSensor,
@@ -11,9 +18,12 @@ import {
   useSensors,
   type CollisionDetection,
   type KeyboardCoordinateGetter,
+  type Modifier,
 } from '@dnd-kit/core'
+import { CSS, type Transform } from '@dnd-kit/utilities'
 import { motion } from 'motion/react'
-import { Check, FolderPlus, Maximize2, Plus, Settings2 } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, FolderPlus, Maximize2, Plus } from 'lucide-react'
+import { toast } from 'sonner'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,12 +41,68 @@ import {
   type IconSize,
   getIconSize,
   iconSizePresets,
+  gridLayoutKey,
+  getGridTrackCount,
+  gridTarget,
+  responsiveGridPositions,
+  type GridPositions,
 } from '@/lib/desktop-layout'
 import { getDesktopOrder, type DesktopItem, type Workspace } from '@/lib/workspace'
-import { ItemVisual, SiteTile, type TileHandlers } from './site-tile'
+import { SiteTile, type TileHandlers } from './site-tile'
 import { WidgetDragContext } from '@/components/widgets/widget-drag-context'
+import { ActionVisual } from './action-visual'
 
-type TilePosition = { left: number; top: number; width: number; height: number }
+type TilePosition = { left: number; top: number; width: number; height: number; hidden?: boolean }
+
+function useDragClickGuard(isDragging: boolean) {
+  const dragged = useRef(false)
+  const active = useRef(false)
+  useEffect(() => {
+    active.current = isDragging
+    if (isDragging) dragged.current = true
+  }, [isDragging])
+  useEffect(() => {
+    const reset = () => {
+      dragged.current = false
+    }
+    const keyDown = () => {
+      if (!active.current) reset()
+    }
+    const click = (event: MouseEvent) => {
+      if (!dragged.current) return
+      event.preventDefault()
+      event.stopPropagation()
+      dragged.current = false
+    }
+    // Cancel the link default before dnd-kit stops click propagation at the document.
+    window.addEventListener('click', click, true)
+    window.addEventListener('pointerdown', reset, true)
+    window.addEventListener('keydown', keyDown, true)
+    return () => {
+      window.removeEventListener('click', click, true)
+      window.removeEventListener('pointerdown', reset, true)
+      window.removeEventListener('keydown', keyDown, true)
+    }
+  }, [])
+}
+
+function draggableStyle(
+  position: TilePosition,
+  dragging: boolean,
+  isDragging: boolean,
+  transform: Transform | null,
+): CSSProperties {
+  return {
+    left: position.left,
+    top: position.top,
+    width: position.width,
+    height: position.height,
+    display: position.hidden ? 'none' : undefined,
+    transform: dragging && isDragging ? CSS.Translate.toString(transform) : undefined,
+    zIndex: dragging && isDragging ? 50 : undefined,
+    transition: dragging && !isDragging ? 'left 150ms, top 150ms' : undefined,
+  }
+}
 
 export type DesktopWidget = {
   id: string
@@ -54,7 +120,7 @@ function CellTarget({ column, row, style }: { column: number; row: number; style
     <div
       ref={setNodeRef}
       style={style}
-      className="pointer-events-none absolute rounded-xl"
+      className="slot-cell pointer-events-none absolute rounded-xl"
       aria-hidden
     />
   )
@@ -66,6 +132,7 @@ function DraggableSite({
   workspace,
   handlers,
   dragging,
+  folderId,
   onResize,
 }: {
   item: DesktopItem
@@ -73,43 +140,42 @@ function DraggableSite({
   workspace: Workspace
   handlers: TileHandlers
   dragging: boolean
+  folderId?: string
   onResize: (size: IconSize) => void
 }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, isDragging, transform } = useDraggable({
     id: item.id,
     data: { item },
   })
   const drop = useDroppable({
     id: `folder:${item.id}`,
     data: { kind: 'folder', folderId: item.id },
-    disabled: item.kind !== 'folder',
+    disabled: item.kind !== 'folder' || position.hidden,
   })
   return (
-    <motion.div
+    <div
       ref={(node) => {
         setNodeRef(node)
         drop.setNodeRef(node)
       }}
       data-grid-id={item.id}
-      initial={false}
-      animate={position}
-      transition={dragging ? { duration: 0.15 } : { type: 'spring', stiffness: 320, damping: 32 }}
+      data-dragging={dragging && isDragging}
+      style={draggableStyle(position, dragging, isDragging, transform)}
       className="absolute min-w-0"
     >
       <SiteTile
         {...handlers}
         item={item}
         folders={workspace.items.filter((entry) => entry.kind === 'folder')}
-        currentFolderId={null}
+        currentFolderId={folderId ?? null}
         openInNewTab={workspace.settings.openInNewTab}
         drag={{ attributes, listeners }}
-        isDragging={isDragging}
         isOver={drop.isOver}
         size={getIconSize(item.id, item.kind, workspace.iconSizes).id}
         onResize={onResize}
         appearance={workspace.settings.icons}
       />
-    </motion.div>
+    </div>
   )
 }
 
@@ -117,24 +183,26 @@ function DraggableWidget({
   widget,
   position,
   size,
+  dragging,
   onResize,
 }: {
   widget: DesktopWidget
   position: TilePosition
   size: WidgetSize
+  dragging: boolean
   onResize: (size: WidgetSize) => void
 }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: widget.id })
+  const { attributes, listeners, setNodeRef, isDragging, transform } = useDraggable({
+    id: widget.id,
+  })
   const [menuOpen, setMenuOpen] = useState(false)
   return (
-    <motion.div
+    <div
       ref={setNodeRef}
       data-grid-id={widget.id}
-      initial={false}
-      animate={position}
-      transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+      data-dragging={dragging && isDragging}
       className="desktop-widget absolute min-h-0"
-      style={{ opacity: isDragging ? 0.25 : 1 }}
+      style={draggableStyle(position, dragging, isDragging, transform)}
       onContextMenu={(event) => {
         event.preventDefault()
         setMenuOpen(true)
@@ -165,57 +233,125 @@ function DraggableWidget({
           </div>
         </DropdownMenuContent>
       </DropdownMenu>
-    </motion.div>
+    </div>
   )
 }
 
 function ActionTile({
   id,
   position,
-  children,
+  dragging,
+  onSettings,
+  onAdd,
+  onNewFolder,
+  folderMode = false,
 }: {
   id: string
   position: TilePosition
-  children: ReactNode
+  dragging: boolean
+  onSettings?: () => void
+  onAdd: () => void
+  onNewFolder?: () => void
+  folderMode?: boolean
 }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id })
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging, transform } =
+    useDraggable({
+      id,
+    })
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
   return (
-    <motion.div
+    <div
       ref={setNodeRef}
       data-grid-id={id}
-      animate={position}
-      initial={false}
-      transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+      data-dragging={dragging && isDragging}
       className="absolute"
-      style={{ opacity: isDragging ? 0.3 : 1 }}
-      {...attributes}
-      {...listeners}
+      style={draggableStyle(position, dragging, isDragging, transform)}
     >
-      {children}
-    </motion.div>
+      <button
+        ref={(node) => {
+          buttonRef.current = node
+          setActivatorNodeRef(node)
+        }}
+        {...attributes}
+        {...listeners}
+        aria-haspopup={id === 'action:add' ? 'menu' : undefined}
+        aria-expanded={id === 'action:add' ? menuOpen : undefined}
+        onKeyUp={(event) => {
+          if (event.code === 'Space') event.preventDefault()
+        }}
+        onClick={() => {
+          if (isDragging) return
+          if (id === 'action:settings') onSettings?.()
+          else if (folderMode) onAdd()
+          else setMenuOpen(true)
+        }}
+        aria-label={
+          id === 'action:settings' ? '打开设置' : folderMode ? '在分组中添加网站' : '添加图标'
+        }
+        className="site-launch relative block size-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+      >
+        <ActionVisual
+          settings={id === 'action:settings'}
+          label={id === 'action:settings' ? '设置' : folderMode ? '添加网站' : '添加图标'}
+        />
+      </button>
+      {id === 'action:add' && !folderMode && (
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          <DropdownMenuTrigger asChild>
+            <span className="pointer-events-none absolute inset-0" aria-hidden />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            onCloseAutoFocus={(event) => {
+              event.preventDefault()
+              buttonRef.current?.focus()
+            }}
+          >
+            <DropdownMenuItem onSelect={onAdd}>
+              <Plus />
+              添加网站
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={onNewFolder}>
+              <FolderPlus />
+              新建分组
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </div>
   )
 }
 
 export type DesktopGridProps = TileHandlers & {
   items: DesktopItem[]
   workspace: Workspace
-  widgets: DesktopWidget[]
+  widgets?: DesktopWidget[]
+  folderId?: string
+  arrangeRef?: RefObject<(() => void) | null>
   onAdd: () => void
-  onNewFolder: () => void
-  onSettings: () => void
-  onPositionsChange: (positions: Record<string, GridPosition>) => void
-  onWidgetSizeChange: (
+  onNewFolder?: () => void
+  onSettings?: () => void
+  onPositionsChange: (key: string, positions: GridPositions, moved?: boolean) => void
+  onWidgetSizeChange?: (
     key: keyof Workspace['widgetSizes'],
     size: WidgetSize,
-    positions: Record<string, GridPosition>,
+    layoutKey: string,
+    positions: GridPositions,
   ) => void
-  onIconSizeChange: (id: string, size: IconSize, positions: Record<string, GridPosition>) => void
+  onIconSizeChange: (
+    id: string,
+    size: IconSize,
+    layoutKey: string,
+    positions: GridPositions,
+  ) => void
 }
 
 export function DesktopGrid({
   items,
   workspace,
-  widgets,
+  widgets = [],
+  folderId,
+  arrangeRef,
   onAdd,
   onNewFolder,
   onSettings,
@@ -225,52 +361,85 @@ export function DesktopGrid({
   ...handlers
 }: DesktopGridProps) {
   const rootRef = useRef<HTMLDivElement>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const viewportRef = useRef<HTMLDivElement>(null)
   const appearance = workspace.settings.icons
-  const [metrics, setMetrics] = useState({
-    width: Math.min(window.innerWidth - 80, appearance.maxWidth),
-  })
+  const [metrics, setMetrics] = useState({ width: 0, height: 0, measured: false })
   const [dragId, setDragId] = useState<string | null>(null)
   const [target, setTarget] = useState<GridPosition | null>(null)
-  const columns = Math.max(
-    1,
-    Math.floor((metrics.width + appearance.gapX) / (appearance.size + appearance.gapX)),
+  const [pageIndex, setPageIndex] = useState(0)
+  const [hoverPage, setHoverPage] = useState<number | null>(null)
+  const [folderAvailable, setFolderAvailable] = useState(window.innerHeight * 0.88)
+  useDragClickGuard(!!dragId)
+  const columnStep = appearance.size + appearance.gapX
+  const rowStep = appearance.size + appearance.gapY
+  const labelHeight = appearance.showName ? appearance.nameSize * 1.1 + 6 : 0
+  const columns = getGridTrackCount(metrics.width, appearance.size, appearance.gapX)
+  const rows = getGridTrackCount(metrics.height, appearance.size, appearance.gapY, labelHeight)
+  const layoutKey = gridLayoutKey(columns, rows)
+  const gridId = folderId ? `folder:${folderId}` : 'desktop'
+  const layouts = workspace.gridLayouts[gridId] ?? {}
+  const savedProfile = layouts[layoutKey]
+  const saved = responsiveGridPositions(
+    layouts,
+    columns,
+    rows,
+    folderId ? {} : workspace.desktopPositions,
   )
-  const rowHeight = appearance.size
-  const rowGap = appearance.gapY
-  useEffect(() => {
-    const observer = new ResizeObserver(([entry]) => {
-      const width = entry.contentRect.width
-      setMetrics({ width })
-    })
-    if (containerRef.current) observer.observe(containerRef.current)
-    return () => observer.disconnect()
-  }, [])
-  const cellWidth = appearance.size
-  const columnStep = cellWidth + appearance.gapX
-  const rowStep = rowHeight + rowGap
-  const order = getDesktopOrder(workspace.desktopOrder, [
+
+  const order = getDesktopOrder(folderId ? [] : workspace.desktopOrder, [
     ...widgets.map((widget) => widget.id),
     ...items.map((item) => item.id),
   ])
   const entries = [
     ...order.map((id) => {
       const widget = widgets.find((entry) => entry.id === id)
-      const preset = widget
-        ? widgetSizePresets.find((entry) => entry.id === workspace.widgetSizes[widget.sizeKey])!
-        : null
-      const item = items.find((entry) => entry.id === id)
-      const iconSize = item ? getIconSize(id, item.kind, workspace.iconSizes) : null
-      return {
-        id,
-        columns: preset?.columns ?? iconSize?.columns ?? 1,
-        rows: preset?.rows ?? iconSize?.rows ?? 1,
+      if (widget) {
+        const size = widgetSizePresets.find(
+          (entry) => entry.id === workspace.widgetSizes[widget.sizeKey],
+        )!
+        return { id, columns: size.columns, rows: size.rows }
       }
+      const item = items.find((entry) => entry.id === id)!
+      const size = getIconSize(id, item.kind, workspace.iconSizes)
+      return { id, columns: size.columns, rows: size.rows }
     }),
-    { id: 'action:settings', columns: 1, rows: 1 },
+    ...(!folderId ? [{ id: 'action:settings', columns: 1, rows: 1 }] : []),
     { id: 'action:add', columns: 1, rows: 1 },
   ]
-  const layout = arrangeDesktop(entries, workspace.desktopPositions, columns)
+  const layout = arrangeDesktop(entries, saved, columns, undefined, rows)
+  const contentLayout = folderId ? arrangeDesktop(entries, {}, columns) : []
+  const contentRows = Math.max(1, ...contentLayout.map((entry) => entry.row + entry.rows))
+  const folderHeight = Math.min(
+    folderAvailable,
+    contentRows * rowStep - appearance.gapY + labelHeight + 16 + 36,
+  )
+
+  // Finish the initial grid measurement before the dialog's first visible frame.
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport) return
+    const measure = () => {
+      const bounds = viewport.getBoundingClientRect()
+      const style = getComputedStyle(viewport)
+      const width = bounds.width - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+      const height = bounds.height - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)
+      setMetrics((current) =>
+        current.measured && current.width === width && current.height === height
+          ? current
+          : { width, height, measured: true },
+      )
+    }
+    measure()
+    const observer = new ResizeObserver(() => {
+      measure()
+      setDragId(null)
+      setTarget(null)
+      setHoverPage(null)
+    })
+    observer.observe(viewport)
+    return () => observer.disconnect()
+  }, [folderHeight, appearance.gapX])
+
   const active = layout.find((entry) => entry.id === dragId)
   const preview =
     active && target
@@ -279,14 +448,79 @@ export function DesktopGrid({
           { ...positionsFromLayout(layout), [active.id]: target },
           columns,
           active.id,
+          rows,
         )
       : layout
-  const rowCount = Math.max(
-    2,
-    ...preview.map((entry) => entry.row + entry.rows),
-    target ? target.row + (active?.rows ?? 1) + 1 : 0,
-  )
+  const pageCount = Math.max(1, ...preview.map((entry) => Math.floor(entry.row / rows) + 1))
+  const page = Math.min(pageIndex, pageCount - 1)
+
+  useLayoutEffect(() => {
+    if (!folderId || !viewportRef.current) return
+    const shell = viewportRef.current.parentElement!
+    const panel = shell.closest<HTMLElement>('.folder-panel')!
+    const measure = () =>
+      setFolderAvailable(
+        Math.max(0, window.innerHeight * 0.88 - (panel.offsetHeight - shell.offsetHeight)),
+      )
+    const observer = new ResizeObserver(measure)
+    observer.observe(panel)
+    window.addEventListener('resize', measure)
+    measure()
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [folderId])
+
+  useEffect(() => {
+    if (!arrangeRef) return
+    arrangeRef.current = () => {
+      const previous = positionsFromLayout(layout)
+      onPositionsChange(
+        layoutKey,
+        positionsFromLayout(arrangeDesktop(entries, {}, columns, undefined, rows)),
+        true,
+      )
+      setPageIndex(0)
+      toast('已按槽位自动整理', {
+        action: { label: '撤销', onClick: () => onPositionsChange(layoutKey, previous, true) },
+      })
+    }
+    return () => {
+      arrangeRef.current = null
+    }
+  })
+
+  // Capture each measured grid separately before a resize or a narrow-window edit can replace it.
+  useEffect(() => {
+    if (!metrics.measured || savedProfile || dragId) return
+    // Initial dialog measurements can change synchronously before the first paint.
+    const frame = requestAnimationFrame(() =>
+      onPositionsChange(layoutKey, positionsFromLayout(layout), false),
+    )
+    return () => cancelAnimationFrame(frame)
+  }, [metrics.measured, savedProfile, dragId, layoutKey, layout, onPositionsChange])
+
+  function turnPage(nextPage: number) {
+    const next = Math.max(0, Math.min(pageCount - 1, nextPage))
+    if (active) {
+      const location = target ?? active
+      setTarget(gridTarget(location.column, location.row % rows, active, columns, rows, next))
+    }
+    setPageIndex(next)
+  }
+  useEffect(() => {
+    if (!dragId || hoverPage === null || hoverPage === page) return
+    const timer = setTimeout(() => turnPage(hoverPage), 450)
+    return () => clearTimeout(timer)
+  })
+
   const keyboardCoordinates: KeyboardCoordinateGetter = (event, { currentCoordinates }) => {
+    if (event.code === 'PageDown' || event.code === 'PageUp') {
+      event.preventDefault()
+      turnPage(page + (event.code === 'PageDown' ? 1 : -1))
+      return
+    }
     const delta = {
       ArrowRight: [columnStep, 0],
       ArrowLeft: [-columnStep, 0],
@@ -300,8 +534,27 @@ export function DesktopGrid({
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 7 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 180, tolerance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: keyboardCoordinates }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: keyboardCoordinates,
+      scrollBehavior: 'auto',
+      keyboardCodes: { start: ['Space'], cancel: ['Escape'], end: ['Space', 'Enter'] },
+    }),
   )
+  const restrictToSlots: Modifier = ({ transform, activeNodeRect }) => {
+    const rect = rootRef.current?.getBoundingClientRect()
+    if (!rect || !activeNodeRect) return transform
+    return {
+      ...transform,
+      x: Math.max(
+        rect.left - activeNodeRect.left,
+        Math.min(rect.right - activeNodeRect.right, transform.x),
+      ),
+      y: Math.max(
+        rect.top - activeNodeRect.top,
+        Math.min(rect.bottom - labelHeight - activeNodeRect.bottom, transform.y),
+      ),
+    }
+  }
   const collisionDetection: CollisionDetection = (args) => {
     const rect = rootRef.current?.getBoundingClientRect()
     const current = layout.find((entry) => entry.id === args.active.id)
@@ -310,78 +563,82 @@ export function DesktopGrid({
       const pointer = args.pointerCoordinates
       const folder = layout.find(
         (entry) =>
+          Math.floor(entry.row / rows) === page &&
           items.some((item) => item.id === entry.id && item.kind === 'folder') &&
           pointer.x >= rect.left + entry.column * columnStep &&
-          pointer.x <=
-            rect.left + entry.column * columnStep + entry.columns * columnStep - appearance.gapX &&
-          pointer.y >= rect.top + entry.row * rowStep &&
-          pointer.y <= rect.top + entry.row * rowStep + entry.rows * rowStep - rowGap,
+          pointer.x <= rect.left + (entry.column + entry.columns) * columnStep - appearance.gapX &&
+          pointer.y >= rect.top + (entry.row % rows) * rowStep &&
+          pointer.y <= rect.top + ((entry.row % rows) + entry.rows) * rowStep - appearance.gapY,
       )
       if (folder) return [{ id: `folder:${folder.id}` }]
     }
-    const column = Math.max(
-      0,
-      Math.min(
-        columns - current.columns,
-        Math.round((args.collisionRect.left - rect.left) / columnStep),
-      ),
-    )
-    const row = Math.max(0, Math.round((args.collisionRect.top - rect.top) / rowStep))
-    const id = `cell:${column}:${row}`
+    const location = args.pointerCoordinates
+      ? gridTarget(
+          (args.collisionRect.left - rect.left) / columnStep,
+          (args.collisionRect.top - rect.top) / rowStep,
+          current,
+          columns,
+          rows,
+          page,
+        )
+      : (target ?? gridTarget(current.column, current.row % rows, current, columns, rows, page))
+    const id = `cell:${location.column}:${location.row}`
     return args.droppableContainers.some((entry) => entry.id === id) ? [{ id }] : []
   }
-  function position(entry: PlacedEntry): TilePosition {
+  function position(entry: PlacedEntry, hidden = false): TilePosition {
     return {
       left: entry.column * columnStep,
-      top: entry.row * rowStep,
+      top: (entry.row % rows) * rowStep,
       width: entry.columns * columnStep - appearance.gapX,
-      height: entry.rows * rowStep - rowGap,
+      height: entry.rows * rowStep - appearance.gapY,
+      hidden,
     }
   }
-  function resize(widget: DesktopWidget, size: WidgetSize) {
+  function resizeWidget(widget: DesktopWidget, size: WidgetSize) {
     const preset = widgetSizePresets.find((entry) => entry.id === size)!
     const resized = entries.map((entry) =>
       entry.id === widget.id ? { ...entry, columns: preset.columns, rows: preset.rows } : entry,
     )
-    const next = arrangeDesktop(resized, positionsFromLayout(layout), columns, widget.id)
-    onWidgetSizeChange(widget.sizeKey, size, positionsFromLayout(next))
+    const next = arrangeDesktop(resized, positionsFromLayout(layout), columns, widget.id, rows)
+    onWidgetSizeChange?.(widget.sizeKey, size, layoutKey, positionsFromLayout(next))
   }
   function resizeIcon(item: DesktopItem, size: IconSize) {
     const preset = iconSizePresets.find((entry) => entry.id === size)!
     const resized = entries.map((entry) =>
       entry.id === item.id ? { ...entry, columns: preset.columns, rows: preset.rows } : entry,
     )
-    const next = arrangeDesktop(resized, positionsFromLayout(layout), columns, item.id)
-    onIconSizeChange(item.id, size, positionsFromLayout(next))
+    const next = arrangeDesktop(resized, positionsFromLayout(layout), columns, item.id, rows)
+    onIconSizeChange(item.id, size, layoutKey, positionsFromLayout(next))
+  }
+  function finishDrag() {
+    setDragId(null)
+    setTarget(null)
+    setHoverPage(null)
   }
   const draggingItem = items.find((item) => item.id === dragId)
-  const draggingWidget = widgets.find((widget) => widget.id === dragId)
-  const actionClass =
-    'site-launch relative block size-full rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/40'
   return (
     <DndContext
       sensors={sensors}
+      modifiers={[restrictToSlots]}
+      autoScroll={false}
       collisionDetection={collisionDetection}
       onDragStart={(event) => setDragId(String(event.active.id))}
       onDragMove={(event) => {
         const original = layout.find((entry) => entry.id === event.active.id)
         if (event.over?.data.current?.kind === 'folder') setTarget(null)
         else if (original)
-          setTarget({
-            column: Math.max(
-              0,
-              Math.min(
-                columns - original.columns,
-                Math.round(original.column + event.delta.x / columnStep),
-              ),
+          setTarget(
+            gridTarget(
+              original.column + event.delta.x / columnStep,
+              (original.row % rows) + event.delta.y / rowStep,
+              original,
+              columns,
+              rows,
+              page,
             ),
-            row: Math.max(0, Math.round(original.row + event.delta.y / rowStep)),
-          })
+          )
       }}
-      onDragCancel={() => {
-        setDragId(null)
-        setTarget(null)
-      }}
+      onDragCancel={finishDrag}
       onDragEnd={(event) => {
         if (event.over?.data.current?.kind === 'folder' && draggingItem?.kind === 'shortcut')
           handlers.onMove(draggingItem.id, event.over.data.current.folderId)
@@ -396,134 +653,143 @@ export function DesktopGrid({
               },
               columns,
               active.id,
+              rows,
             )
-            onPositionsChange(positionsFromLayout(next))
+            onPositionsChange(layoutKey, positionsFromLayout(next), true)
           }
         }
-        setDragId(null)
-        setTarget(null)
+        finishDrag()
       }}
       accessibility={{
         screenReaderInstructions: {
-          draggable: '按空格抓起，使用方向键移动到任意网格，按空格放下，Escape 取消。',
+          draggable: '按空格抓起，方向键移动，PageUp 或 PageDown 翻页，空格放下，Escape 取消。',
         },
       }}
     >
-      <div ref={containerRef} className="w-full">
+      <div
+        className={`flex min-h-0 w-full flex-col ${folderId ? 'shrink' : 'flex-1'}`}
+        style={folderId ? { height: folderHeight } : undefined}
+      >
         <div
-          ref={rootRef}
-          className="desktop-grid relative mx-auto"
-          aria-label="桌面图标与小组件"
-          style={{
-            width: columns * columnStep - appearance.gapX,
-            height:
-              rowCount * rowStep -
-              rowGap +
-              (appearance.showName ? appearance.nameSize * 1.1 + 6 : 0),
-          }}
+          ref={viewportRef}
+          className="slot-viewport min-h-0 flex-1 overflow-hidden py-2"
+          style={{ paddingInline: Math.max(8, appearance.gapX / 2) }}
         >
-          {Array.from({ length: rowCount + 1 }, (_, row) =>
-            Array.from({ length: columns }, (_, column) => (
-              <CellTarget
-                key={`${column}:${row}`}
-                column={column}
-                row={row}
-                style={{
-                  left: column * columnStep,
-                  top: row * rowStep,
-                  width: cellWidth,
-                  height: rowHeight,
-                }}
+          <div
+            ref={rootRef}
+            className="desktop-grid relative mx-auto"
+            aria-label={folderId ? '分组网站' : '桌面图标与小组件'}
+            data-layout-key={layoutKey}
+            data-page={page + 1}
+            data-sorting={!!dragId}
+            style={{
+              width: columns * columnStep - appearance.gapX,
+              height: rows * rowStep - appearance.gapY + labelHeight,
+              visibility: metrics.measured ? 'visible' : 'hidden',
+            }}
+          >
+            {Array.from({ length: rows }, (_, row) =>
+              Array.from({ length: columns }, (_, column) => (
+                <CellTarget
+                  key={`${page}:${column}:${row}`}
+                  column={column}
+                  row={page * rows + row}
+                  style={{
+                    left: column * columnStep,
+                    top: row * rowStep,
+                    width: appearance.size,
+                    height: appearance.size,
+                  }}
+                />
+              )),
+            )}
+            {active && target && (
+              <motion.div
+                className="pointer-events-none absolute rounded-2xl border border-primary/20 bg-primary/8"
+                animate={position({ ...active, ...target })}
+                transition={{ duration: 0.12 }}
               />
-            )),
-          )}
-          {dragId && active && target && (
-            <motion.div
-              className="pointer-events-none absolute rounded-2xl border border-primary/20 bg-primary/8"
-              animate={position({ ...active, ...target })}
-              transition={{ duration: 0.12 }}
-            />
-          )}
-          {preview.map((entry) => {
-            const widget = widgets.find((widget) => widget.id === entry.id)
-            if (widget)
+            )}
+            {preview.map((entry) => {
+              const source = entry.id === dragId && active ? active : entry
+              const hidden = entry.id !== dragId && Math.floor(entry.row / rows) !== page
+              const sourcePosition = position(source, hidden)
+              const widget = widgets.find((widget) => widget.id === entry.id)
+              if (widget)
+                return (
+                  <DraggableWidget
+                    key={entry.id}
+                    widget={widget}
+                    position={sourcePosition}
+                    size={workspace.widgetSizes[widget.sizeKey]}
+                    dragging={!!dragId}
+                    onResize={(size) => resizeWidget(widget, size)}
+                  />
+                )
+              const item = items.find((item) => item.id === entry.id)
+              if (item)
+                return (
+                  <DraggableSite
+                    key={entry.id}
+                    item={item}
+                    position={sourcePosition}
+                    workspace={workspace}
+                    handlers={handlers}
+                    dragging={!!dragId}
+                    folderId={folderId}
+                    onResize={(size) => resizeIcon(item, size)}
+                  />
+                )
               return (
-                <DraggableWidget
+                <ActionTile
                   key={entry.id}
-                  widget={widget}
-                  position={position(entry)}
-                  size={workspace.widgetSizes[widget.sizeKey]}
-                  onResize={(size) => resize(widget, size)}
-                />
-              )
-            const item = items.find((item) => item.id === entry.id)
-            if (item)
-              return (
-                <DraggableSite
-                  key={entry.id}
-                  item={item}
-                  position={position(entry)}
-                  workspace={workspace}
-                  handlers={handlers}
+                  id={entry.id}
+                  position={sourcePosition}
                   dragging={!!dragId}
-                  onResize={(size) => resizeIcon(item, size)}
+                  folderMode={!!folderId}
+                  onSettings={onSettings}
+                  onAdd={onAdd}
+                  onNewFolder={onNewFolder}
                 />
               )
-            return (
-              <ActionTile key={entry.id} id={entry.id} position={position(entry)}>
-                {entry.id === 'action:settings' ? (
-                  <button onClick={onSettings} aria-label="打开设置" className={actionClass}>
-                    <span className="action-icon flex items-center justify-center border border-surface-border/65 bg-shortcut/90 text-primary/60 shadow-sm">
-                      <Settings2 size={25} strokeWidth={1.6} />
-                    </span>
-                    <span className="tile-label action-label">设置</span>
-                  </button>
-                ) : (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className={actionClass} aria-label="添加图标">
-                        <span className="action-icon flex items-center justify-center border border-dashed border-primary/20 bg-shortcut/40 text-primary/50">
-                          <Plus size={25} strokeWidth={1.5} />
-                        </span>
-                        <span className="tile-label action-label">添加图标</span>
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuItem onSelect={onAdd}>
-                        <Plus />
-                        添加网站
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={onNewFolder}>
-                        <FolderPlus />
-                        新建分组
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </ActionTile>
-            )
-          })}
+            })}
+          </div>
+        </div>
+        <div className="h-9 shrink-0">
+          {pageCount > 1 && (
+            <nav
+              className="grid-pagination flex h-9 shrink-0 items-center justify-center gap-3"
+              aria-label={folderId ? '分组分页' : '桌面分页'}
+            >
+              <button
+                type="button"
+                className="grid-page-button"
+                aria-label="上一页"
+                disabled={page === 0}
+                onClick={() => turnPage(page - 1)}
+                onPointerEnter={() => setHoverPage(page - 1)}
+                onPointerLeave={() => setHoverPage(null)}
+              >
+                <ChevronLeft size={17} />
+              </button>
+              <span className="min-w-12 text-center text-xs tabular-nums" aria-live="polite">
+                {page + 1} / {pageCount}
+              </span>
+              <button
+                type="button"
+                className="grid-page-button"
+                aria-label="下一页"
+                disabled={page + 1 >= pageCount}
+                onClick={() => turnPage(page + 1)}
+                onPointerEnter={() => setHoverPage(page + 1)}
+                onPointerLeave={() => setHoverPage(null)}
+              >
+                <ChevronRight size={17} />
+              </button>
+            </nav>
+          )}
         </div>
       </div>
-      <DragOverlay dropAnimation={{ duration: 240, easing: 'cubic-bezier(.2,.8,.2,1)' }}>
-        {draggingItem ? (
-          <ItemVisual
-            item={draggingItem}
-            size={getIconSize(draggingItem.id, draggingItem.kind, workspace.iconSizes).id}
-            width={active ? position(active).width : undefined}
-            height={active ? position(active).height : undefined}
-            overlay
-            appearance={appearance}
-          />
-        ) : draggingWidget && active ? (
-          <div
-            className="overflow-hidden rounded-[17px] bg-surface shadow-2xl"
-            style={{ width: position(active).width, height: position(active).height }}
-          >
-            {draggingWidget.content}
-          </div>
-        ) : null}
-      </DragOverlay>
     </DndContext>
   )
 }

@@ -71,7 +71,7 @@ export function IconColorPicker({
       >
         <input
           type="color"
-          value={value && value !== 'transparent' ? value : '#1681ff'}
+          value={value && value !== 'transparent' ? value.slice(0, 7) : '#1681ff'}
           onChange={(event) => onChange(event.target.value)}
           aria-label={`自定义${label}`}
           className="absolute inset-0 size-full cursor-pointer opacity-0"

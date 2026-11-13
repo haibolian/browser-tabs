@@ -1,17 +1,19 @@
 # Debian 12 后端部署
 
-采用 Node.js 24 + systemd + Nginx。扩展继续在自己的电脑加载，服务器只运行 GitHub 登录和备份 API。
+采用 Node.js 24 + pnpm + systemd + Nginx。后端业务代码在本机或 CI 中构建为 `index.mjs`，第三方依赖由服务器按锁文件安装。扩展继续在自己的电脑加载，服务器只运行 GitHub 登录和备份 API。
+
+使用 GitHub 自动构建和部署时，按 [自动部署文档](github-actions.md) 配置；以下步骤用于手动部署。
 
 ## 环境
 
 - Debian 12，具备 root 或 sudo 权限。
-- Node.js 24.x、pnpm 11.25.0。Debian 12 默认仓库中的 Node.js 版本不满足项目要求。
+- 服务器安装 Node.js 24.x 和 pnpm 11.25.0。Debian 12 默认仓库中的 Node.js 版本不满足项目要求。
 - Nginx、Certbot；SQLite 使用 Node 内置模块，无需安装 MySQL、Redis 或独立 SQLite 服务。
 - 一个解析到服务器的域名。以下使用 `backup.example.com`，所有配置处都需替换为实际域名。
 - 服务器安全组/防火墙允许 TCP 80、443；后端 3001 只监听本机。保留现有 SSH 访问规则。
 - 服务器可以通过 HTTPS 访问 `github.com` 和 `api.github.com`。
 
-个人使用建议从 1 核、1 GB 内存起步；服务器上安装依赖和构建时，2 GB 内存更宽裕。磁盘按备份大小预留空间，备份包含原始壁纸和图标，20 份是每账号的数量上限。
+个人使用建议从 1 核、1 GB 内存起步。磁盘按备份大小预留空间，备份包含原始壁纸和图标，20 份是每账号的数量上限。
 
 ## 1. 安装环境
 
@@ -19,7 +21,7 @@
 
 ```bash
 apt update
-apt install -y ca-certificates curl nano nginx certbot python3-certbot-nginx
+apt install -y ca-certificates curl nano sudo nginx certbot python3-certbot-nginx
 curl -fsSL https://deb.nodesource.com/setup_24.x -o /tmp/blank-nodesource-setup.sh
 bash /tmp/blank-nodesource-setup.sh
 apt install -y nodejs
@@ -30,28 +32,31 @@ pnpm --version
 
 确认 Node 输出 `v24.x.x`，pnpm 输出 `11.25.0`。systemd 模板使用 NodeSource 安装的 `/usr/bin/node`。
 
-## 2. 上传源码并构建
+## 2. 本机构建并上传部署包
 
 在本机 PowerShell 的项目根目录执行，将 `服务器IP` 替换为实际地址：
 
 ```powershell
-tar -czf browser-tabs-server.tar.gz --exclude=server/data package.json pnpm-lock.yaml tsconfig.server.json tsconfig.app.json server src deploy docs
+pnpm install --frozen-lockfile
+pnpm server:build
+pnpm verify:server
 scp browser-tabs-server.tar.gz root@服务器IP:/tmp/
 ```
 
-该压缩包包含当前源码及部署模板，不包含本机密钥、数据库和 Windows 的 `node_modules`。后端构建会用到 `src/lib` 中的共享校验代码，因此需要一并上传 `src`。
+构建生成 `server-dist/index.mjs` 和 `browser-tabs-server.tar.gz`。压缩包包含后端产物、`package.json`、`pnpm-lock.yaml`、`pnpm-workspace.yaml`、部署模板及本文档。Fastify、Zod 等第三方依赖保持外部引用，由服务器安装到 `node_modules`；SQLite 由 Node.js 内置模块提供。`verify:server` 在项目外的临时目录解压部署包，安装生产依赖，再检查启动、HTTP、CORS、参数校验和重启后的 SQLite 数据保留。
 
 在服务器执行：
 
 ```bash
-mkdir -p /opt/browser-tabs
-tar -xzf /tmp/browser-tabs-server.tar.gz -C /opt/browser-tabs
-cd /opt/browser-tabs
-pnpm install --frozen-lockfile
-pnpm server:build
+release="/opt/browser-tabs/releases/manual-$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$release"
+tar -xzf /tmp/browser-tabs-server.tar.gz -C "$release"
+cd "$release"
+pnpm install --prod --frozen-lockfile
+ln -sfn "$release" /opt/browser-tabs/current
 ```
 
-构建成功后生成 `server-dist/index.js`。服务器运行时仍需当前目录中的 `node_modules`。无需启动 Vite 或运行前端 `pnpm dev`。
+安装成功后由 systemd 启动后端。部署包不包含 TypeScript 源码或本机 `node_modules`；服务器会按锁定版本安装生产依赖，跳过 TypeScript、测试和构建工具。
 
 ## 3. 填写后端配置
 
@@ -59,7 +64,7 @@ pnpm server:build
 
 ```bash
 id blank-backup >/dev/null 2>&1 || useradd --system --user-group --home-dir /var/lib/blank-backup --no-create-home --shell /usr/sbin/nologin blank-backup
-install -m 600 /opt/browser-tabs/deploy/server.env.example /etc/blank-backup.env
+install -m 600 /opt/browser-tabs/current/deploy/server.env.example /etc/blank-backup.env
 nano /etc/blank-backup.env
 ```
 
@@ -78,7 +83,7 @@ GITHUB_RETURN_URLS=https://nplbljhenhbjjccehgckeanlbiknanoe.chromiumapp.org/gith
 ## 4. 启动并设置开机运行
 
 ```bash
-install -m 644 /opt/browser-tabs/deploy/blank-backup.service /etc/systemd/system/blank-backup.service
+install -m 644 /opt/browser-tabs/current/deploy/blank-backup.service /etc/systemd/system/blank-backup.service
 systemctl daemon-reload
 systemctl enable --now blank-backup
 systemctl status blank-backup --no-pager
@@ -96,7 +101,7 @@ journalctl -u blank-backup -n 100 --no-pager
 ## 5. 配置 Nginx 和 HTTPS
 
 ```bash
-install -m 644 /opt/browser-tabs/deploy/nginx.conf /etc/nginx/sites-available/blank-backup
+install -m 644 /opt/browser-tabs/current/deploy/nginx.conf /etc/nginx/sites-available/blank-backup
 nano /etc/nginx/sites-available/blank-backup
 ```
 
@@ -136,18 +141,22 @@ certbot renew --dry-run
 
 ## 更新与备份
 
-更新代码前先保存数据库副本。在本机重新生成源码压缩包并上传；服务器停止服务后解压、安装依赖、构建、启动：
+在本机重新执行 `pnpm server:build` 和 `pnpm verify:server`，上传新的部署包。服务器先在新目录安装依赖，成功后停止服务、保存数据库副本、切换程序并启动：
 
 ```bash
+release="/opt/browser-tabs/releases/manual-$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$release"
+tar -xzf /tmp/browser-tabs-server.tar.gz -C "$release"
+cd "$release"
+pnpm install --prod --frozen-lockfile
 systemctl stop blank-backup
 mkdir -p /root/blank-backup-snapshots
 cp -a /var/lib/blank-backup "/root/blank-backup-snapshots/$(date +%Y%m%d-%H%M%S)"
-tar -xzf /tmp/browser-tabs-server.tar.gz -C /opt/browser-tabs
-cd /opt/browser-tabs
-pnpm install --frozen-lockfile
-pnpm server:build
+ln -sfn "$release" /opt/browser-tabs/current
+install -m 644 "$release/deploy/blank-backup.service" /etc/systemd/system/blank-backup.service
+systemctl daemon-reload
 systemctl start blank-backup
 curl -fsS http://127.0.0.1:3001/api/v1/health
 ```
 
-安装或构建报错时先处理报错，再执行启动。数据库位于 `/var/lib/blank-backup`，配置位于 `/etc/blank-backup.env`，更新源码不会覆盖这两个路径。数据库使用 WAL，停服后复制整个数据目录；运行时备份需使用 SQLite 在线备份方式。
+依赖安装成功后再切换并启动服务；安装失败时先处理报错。数据库位于 `/var/lib/blank-backup`，配置位于 `/etc/blank-backup.env`，更新部署包不会覆盖这两个路径。服务使用 `current/server-dist/index.mjs` 入口，旧程序保留在 `releases/` 中。数据库使用 WAL，停服后复制整个数据目录；运行时备份需使用 SQLite 在线备份方式。

@@ -1,0 +1,171 @@
+import assert from 'node:assert/strict'
+import { execFileSync, execSync, spawn } from 'node:child_process'
+import { createHash, randomBytes } from 'node:crypto'
+import { mkdtemp, readdir, rm } from 'node:fs/promises'
+import { createServer } from 'node:net'
+import { tmpdir } from 'node:os'
+import { basename, dirname, join, resolve } from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
+
+const root = resolve(import.meta.dirname, '..')
+const directory = await mkdtemp(join(tmpdir(), 'blank-server-release-'))
+const database = join(directory, 'data', 'blank.sqlite')
+const returnUrl = 'https://nplbljhenhbjjccehgckeanlbiknanoe.chromiumapp.org/github'
+let child
+let exited
+let logs = ''
+
+async function start() {
+  const reservation = createServer()
+  await new Promise((resolve, reject) => {
+    reservation.once('error', reject)
+    reservation.listen(0, '127.0.0.1', resolve)
+  })
+  const { port } = reservation.address()
+  await new Promise((resolve, reject) =>
+    reservation.close((error) => (error ? reject(error) : resolve())),
+  )
+  const baseUrl = `http://127.0.0.1:${port}`
+  child = spawn(process.execPath, ['server-dist/index.mjs'], {
+    cwd: directory,
+    windowsHide: true,
+    env: {
+      ...process.env,
+      NODE_ENV: 'production',
+      NODE_PATH: '',
+      NODE_OPTIONS: '',
+      HOST: '127.0.0.1',
+      PORT: String(port),
+      DATABASE_PATH: database,
+      GITHUB_CLIENT_ID: 'bundle-test-client',
+      GITHUB_CLIENT_SECRET: 'bundle-test-secret',
+      GITHUB_CALLBACK_URL: `${baseUrl}/api/v1/auth/github/callback`,
+      GITHUB_RETURN_URLS: returnUrl,
+      BACKUP_LIMIT: '20',
+      AUTO_BACKUP_MERGE_MINUTES: '10',
+      SESSION_DAYS: '30',
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  const running = child
+  exited = new Promise((resolve) => running.once('close', resolve))
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => finish(new Error('Server startup timed out')), 15_000)
+    function finish(error) {
+      clearTimeout(timeout)
+      running.off('error', onError)
+      running.off('exit', onExit)
+      running.stdout.off('data', onOutput)
+      if (error) reject(error)
+      else resolve()
+    }
+    const onError = (error) => finish(error)
+    const onExit = (code) => finish(new Error(`Server exited during startup: ${code}`))
+    const onOutput = (chunk) => {
+      if (chunk.toString().includes('Server listening at')) finish()
+    }
+    running.once('error', onError)
+    running.once('exit', onExit)
+    running.stdout.on('data', (chunk) => {
+      logs += chunk
+    })
+    running.stderr.on('data', (chunk) => {
+      logs += chunk
+    })
+    running.stdout.on('data', onOutput)
+  })
+  return baseUrl
+}
+
+async function stop() {
+  if (!child) return
+  if (child.exitCode === null && child.signalCode === null) child.kill()
+  await exited
+  child = undefined
+}
+
+try {
+  execFileSync('tar', ['-xzf', join(root, 'browser-tabs-server.tar.gz'), '-C', directory], {
+    windowsHide: true,
+    stdio: 'inherit',
+  })
+  assert.deepEqual((await readdir(directory)).sort(), [
+    'deploy',
+    'docs',
+    'package.json',
+    'pnpm-lock.yaml',
+    'pnpm-workspace.yaml',
+    'server-dist',
+  ])
+  execSync('pnpm install --prod --frozen-lockfile', {
+    cwd: directory,
+    windowsHide: true,
+    stdio: 'inherit',
+    env: { ...process.env, CI: 'true' },
+  })
+  const dependencies = await readdir(join(directory, 'node_modules'))
+  assert.ok(dependencies.includes('fastify'))
+  assert.ok(!dependencies.includes('typescript'), 'Development dependencies must not be installed')
+  let baseUrl = await start()
+  const request = (path, options = {}) =>
+    fetch(`${baseUrl}${path}`, {
+      ...options,
+      signal: AbortSignal.timeout(5_000),
+    })
+  const health = await request('/api/v1/health')
+  assert.equal(health.status, 200)
+  assert.deepEqual(await health.json(), { status: 'ok' })
+  assert.equal((await request('/api/v1/backups')).status, 401)
+
+  const preflight = await request('/api/v1/backups', {
+    method: 'OPTIONS',
+    headers: { Origin: 'https://example.com', 'Access-Control-Request-Method': 'POST' },
+  })
+  assert.equal(preflight.status, 204)
+  assert.equal(preflight.headers.get('access-control-allow-origin'), '*')
+
+  const challenge = createHash('sha256').update(randomBytes(32)).digest('base64url')
+  const startLogin = (returnUrl) =>
+    request('/api/v1/auth/github/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ returnUrl, codeChallenge: challenge }),
+    })
+  assert.equal((await startLogin('invalid-url')).status, 400)
+  const authorization = await startLogin(returnUrl)
+  assert.equal(authorization.status, 200)
+  const { state, authorizationUrl } = await authorization.json()
+  assert.equal(new URL(authorizationUrl).origin, 'https://github.com')
+  assert.equal(new URL(authorizationUrl).searchParams.get('state'), state)
+
+  await stop()
+  const db = new DatabaseSync(database, { readOnly: true })
+  try {
+    assert.equal(db.prepare('SELECT COUNT(*) AS count FROM oauth_requests').get().count, 1)
+  } finally {
+    db.close()
+  }
+
+  baseUrl = await start()
+  const callback = await request(
+    `/api/v1/auth/github/callback?state=${state}&error=access_denied`,
+    {
+      redirect: 'manual',
+    },
+  )
+  assert.equal(callback.status, 302)
+  const redirect = new URL(callback.headers.get('location'))
+  assert.equal(`${redirect.origin}${redirect.pathname}`, returnUrl)
+  assert.equal(new URLSearchParams(redirect.hash.slice(1)).get('github_error'), 'access_denied')
+  console.log(
+    'Verified release package with freshly installed production dependencies: startup, HTTP, CORS, validation, OAuth state and SQLite persistence across restarts.',
+  )
+} catch (error) {
+  console.error(logs)
+  throw error
+} finally {
+  await stop()
+  assert.equal(dirname(directory), resolve(tmpdir()))
+  assert.ok(basename(directory).startsWith('blank-server-release-'))
+  await rm(directory, { recursive: true, force: true })
+}

@@ -10,8 +10,9 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 9900",
     "server:dev": "tsx watch --env-file-if-exists=.env.server server/index.ts",
-    "server:build": "tsc -p tsconfig.server.json && esbuild server/index.ts --bundle --platform=node --target=node24 --format=esm --packages=external --outfile=server-dist/index.js",
-    "server:start": "node --env-file-if-exists=.env.server server-dist/index.js",
+    "server:build": "tsc -p tsconfig.server.json && node scripts/build-server.mjs",
+    "server:start": "node --env-file-if-exists=.env.server server-dist/index.mjs",
+    "verify:server": "node scripts/verify-server.mjs",
     "build": "tsc -b && vite build && node scripts/package-extension.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "test": "vitest run",

@@ -92,12 +92,17 @@ Client ID 和 Secret 均未填写时，服务启动会明确警告，GitHub 登�
 
 ```sh
 pnpm server:build
+pnpm verify:server
 pnpm server:start
 ```
 
-构建输出在 `server-dist/`，运行时需要安装 `package.json` 中的生产依赖。部署时持久化 `DATABASE_PATH` 所在目录，通过 HTTPS 反向代理将 `/api/v1/` 转发到后端。插件填写代理域名，例如 `https://backup.example.com`；这个地址必须能被使用插件的设备访问，`127.0.0.1` 仅指向当前设备。SQLite 使用 WAL，维护备份时应停服后复制整个数据库目录，或使用 SQLite 的在线备份工具，不要在运行中仅复制主数据库文件。
+构建将后端业务代码合并为 `server-dist/index.mjs`，Fastify、Zod 等第三方依赖保持外部引用。生成的 `browser-tabs-server.tar.gz` 包含后端产物、`package.json`、`pnpm-lock.yaml`、`pnpm-workspace.yaml`、部署模板和文档。服务器安装 Node.js 24 和 pnpm 后，在解压目录执行 `pnpm install --prod --frozen-lockfile` 安装生产依赖，再启动后端；无需上传 TypeScript 源码或本机 `node_modules`。单独运行时可执行 `node --env-file=.env.server server-dist/index.mjs`；systemd 部署使用 `/etc/blank-backup.env`。`pnpm verify:server` 会在项目外的独立目录解压部署包、安装生产依赖，检查 HTTP、CORS、参数校验和重启后的 SQLite 数据保留。
+
+部署时持久化 `DATABASE_PATH` 所在目录，通过 HTTPS 反向代理将 `/api/v1/` 转发到后端。插件填写代理域名，例如 `https://backup.example.com`；这个地址必须能被使用插件的设备访问，`127.0.0.1` 仅指向当前设备。SQLite 使用 WAL，维护备份时应停服后复制整个数据库目录，或使用 SQLite 的在线备份工具，不要在运行中仅复制主数据库文件。
 
 Debian 12 的安装、上传、systemd 常驻运行、Nginx HTTPS 和数据维护步骤见 [部署文档](docs/deploy-debian12.md)，配置模板位于 `deploy/`。
+
+GitHub Actions 自动部署的 Secrets、Variables 和服务器初始化步骤见 [自动部署文档](docs/github-actions.md)。PR 运行检查；推送到 `main` 后自动构建、通过 SSH 上传、在服务器安装生产依赖并切换版本。
 
 接口前缀为 `/api/v1`，除健康检查和 GitHub OAuth 握手外使用 `Authorization: Bearer <token>`，不使用 Cookie。接口响应不允许缓存，错误返回非 2xx 状态和 `{ "error": "原因" }`。
 

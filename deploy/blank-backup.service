@@ -7,10 +7,10 @@ After=network-online.target
 Type=simple
 User=blank-backup
 Group=blank-backup
-WorkingDirectory=/opt/browser-tabs
+WorkingDirectory=/opt/browser-tabs/current
 Environment=NODE_ENV=production
 EnvironmentFile=/etc/blank-backup.env
-ExecStart=/usr/bin/node /opt/browser-tabs/server-dist/index.js
+ExecStart=/usr/bin/node /opt/browser-tabs/current/server-dist/index.mjs
 Restart=on-failure
 RestartSec=5
 StateDirectory=blank-backup

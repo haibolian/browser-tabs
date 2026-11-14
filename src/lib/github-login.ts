@@ -1,15 +1,15 @@
 import { z } from 'zod'
 import {
   CloudApi,
-  normalizeServerUrl,
   requestServerAccess,
   saveCloudConnection,
   type CloudConnection,
 } from './cloud-api'
+import { CLOUD_SERVER_URL } from './cloud-server'
 
 const pendingKey = 'blank:github-authorization'
 const pendingSchema = z.object({
-  baseUrl: z.string().transform(normalizeServerUrl),
+  baseUrl: z.literal(CLOUD_SERVER_URL),
   state: z.string().min(1),
   codeVerifier: z.string().min(1),
   returnUrl: z.string().url(),
@@ -61,12 +61,12 @@ export function parseGitHubReturn(
 async function finishLogin(returnedUrl: string, pending: PendingLogin): Promise<CloudConnection> {
   try {
     const code = parseGitHubReturn(returnedUrl, pending)
-    const session = await new CloudApi(pending.baseUrl).completeGitHubLogin(
+    const session = await new CloudApi().completeGitHubLogin(
       pending.state,
       code,
       pending.codeVerifier,
     )
-    const connection = { baseUrl: pending.baseUrl, session }
+    const connection: CloudConnection = { baseUrl: CLOUD_SERVER_URL, session }
     saveCloudConnection(connection)
     return connection
   } finally {
@@ -74,17 +74,13 @@ async function finishLogin(returnedUrl: string, pending: PendingLogin): Promise<
   }
 }
 
-export async function signInWithGitHub(baseUrl: string): Promise<CloudConnection | null> {
-  const normalizedUrl = normalizeServerUrl(baseUrl)
-  await requestServerAccess(normalizedUrl)
+export async function signInWithGitHub(): Promise<CloudConnection | null> {
+  await requestServerAccess()
   const returnUrl = githubReturnUrl()
   const pkce = await createPkce()
-  const authorization = await new CloudApi(normalizedUrl).startGitHubLogin(
-    returnUrl,
-    pkce.codeChallenge,
-  )
-  const pending = {
-    baseUrl: normalizedUrl,
+  const authorization = await new CloudApi().startGitHubLogin(returnUrl, pkce.codeChallenge)
+  const pending: PendingLogin = {
+    baseUrl: CLOUD_SERVER_URL,
     returnUrl,
     state: authorization.state,
     codeVerifier: pkce.codeVerifier,
@@ -111,8 +107,12 @@ export function completeGitHubRedirect() {
     history.replaceState(null, '', `${location.pathname}${location.search}`)
     const raw = sessionStorage.getItem(pendingKey)
     if (!raw) throw new Error('找不到此页面发起的 GitHub 登录请求，请返回桌面重新登录')
-    const pending = pendingSchema.parse(JSON.parse(raw))
-    return finishLogin(returnedUrl, pending)
+    const pending = pendingSchema.safeParse(JSON.parse(raw))
+    if (!pending.success) {
+      sessionStorage.removeItem(pendingKey)
+      throw new Error('登录请求已失效，请重新使用 GitHub 登录')
+    }
+    return finishLogin(returnedUrl, pending.data)
   })()
   return redirectCompletion
 }

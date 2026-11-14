@@ -39,14 +39,16 @@ ZIP 是分发包；本地加载前先解压，或直接使用 `dist`。修改代
 
 后端使用 **TypeScript + Node.js 24 + Fastify + SQLite**，代码在 `server/`。前后端复用 Zod 工作区与备份校验规则。**云端仅允许 GitHub 登录，没有本地注册、账号密码登录或密码存储。** 支持多份备份的保存、列表、恢复、删除；每个 GitHub 账号只能访问自己的备份。
 
-在项目根目录执行：
+插件固定连接 `https://tabsapi.lianhb.site`，地址定义在 `src/lib/cloud-server.ts`；页面没有服务器地址输入或切换入口。登录、自动上传和手动恢复共用该地址，其他服务器留下的会话和未完成登录请求需要重新登录。后端的 `HOST`、`PORT` 仅控制服务器监听地址，不参与前端地址配置。
+
+本地调试后端时，在项目根目录执行：
 
 ```sh
 pnpm install
 pnpm server:dev
 ```
 
-另开一个终端执行 `pnpm dev`，或直接打开已构建的扩展。进入「设置 → 数据备份 → 云端备份」，填写 `http://127.0.0.1:3001`，点击「使用 GitHub 登录」，在 GitHub 官方页面授权。网页开发模式会跳转至 GitHub，再返回登录结果页；扩展会打开独立的浏览器授权窗口。**登录后的修改会自动上传，其他设备需手动拉取。** 选择「拉取并恢复」会先展示内容数量，再确认替换当前桌面；恢复后可通过提示撤销。每个账号默认保留最近 20 份备份；同一设备 10 分钟内的自动上传更新同一份，手动点击「立即上传」单独新增一份。不同设备的自动备份分别合并。删除云端备份需要确认且无法撤销，不会删除本地工作区。
+打开已构建的扩展，进入「设置 → 数据备份 → 云端备份」，点击「使用 GitHub 登录」，在 GitHub 官方页面授权。扩展会打开独立的浏览器授权窗口。**登录后的修改会自动上传，其他设备需手动拉取。** 选择「拉取并恢复」会先展示内容数量，再确认替换当前桌面；恢复后可通过提示撤销。每个账号默认保留最近 20 份备份；同一设备 10 分钟内的自动上传更新同一份，手动点击「立即上传」单独新增一份。不同设备的自动备份分别合并。删除云端备份需要确认且无法撤销，不会删除本地工作区。
 
 自动上传在整个桌面页面运行，不依赖设置面板是否打开。内容先保存到 IndexedDB，再上传到当前服务器和 GitHub 账号；连续输入、拖动和设置调整会合并，在最后一次修改保存后约 1.2 秒上传最新版本。上传期间的新修改会继续排队。桌面底部和云端备份面板会显示等待、上传中、最近上传时间或具体错误；失败保留待上传内容，可点击「重试上传」，再次修改也会上传最新版本。退出登录停止上传，待上传记录按服务器和 GitHub 账号隔离；页面关闭后暂停，下次在同一浏览器登录同一账号打开页面时继续处理。
 
@@ -59,17 +61,17 @@ pnpm server:dev
 ### 创建 GitHub OAuth App
 
 1. 打开 [GitHub Developer settings → OAuth Apps](https://github.com/settings/developers)，点击 **New OAuth App**。个人 GitHub 账号即可创建。
-2. 本地开发时填写以下内容：
+2. 为当前部署填写以下内容：
    - **Application name**：`留白新标签页`（可自定义）。
-   - **Homepage URL**：`http://127.0.0.1:9900/`。
-   - **Authorization callback URL**：`http://127.0.0.1:3001/api/v1/auth/github/callback`。
+   - **Homepage URL**：填写项目主页地址。
+   - **Authorization callback URL**：`https://tabsapi.lianhb.site/api/v1/auth/github/callback`。
 3. 注册应用，复制 **Client ID**，点击 **Generate a new client secret** 生成密钥。
-4. 将项目根目录的 `.env.server.example` 复制为 `.env.server`，填写 `GITHUB_CLIENT_ID` 和 `GITHUB_CLIENT_SECRET`。密钥只放后端配置，不发聊天、不提交 Git、不放前端环境变量或扩展包。
-5. 重新启动 `pnpm server:dev`（修改环境文件后需手动重启）。打开前端页面进行 GitHub 登录。不需要启用 Device Flow，也不需要申请仓库或邮件权限。
+4. 在服务器配置中填写 `GITHUB_CLIENT_ID` 和 `GITHUB_CLIENT_SECRET`，将 `GITHUB_CALLBACK_URL` 设为上面的 HTTPS 回调地址。systemd 部署使用 `/etc/blank-backup.env`；本地后端使用 `.env.server`。密钥只放后端配置，不发聊天、不提交 Git、不放前端环境变量或扩展包。
+5. 重新启动后端，打开扩展进行 GitHub 登录。不需要启用 Device Flow，也不需要申请仓库或邮件权限。
 
 本地扩展的固定返回地址为 `https://nplbljhenhbjjccehgckeanlbiknanoe.chromiumapp.org/github`，已加入 `.env.server.example` 的 `GITHUB_RETURN_URLS`。使用已有环境文件时，将此地址加入该配置，多个地址以英文逗号分隔，然后重启后端。**GitHub 后台的 callback URL 填写后端 `/api/v1/auth/github/callback`。** 后端只接受已配置的完整返回地址。
 
-上线时将 Homepage URL、`GITHUB_CALLBACK_URL`、GitHub 后台的 callback URL 和 `GITHUB_RETURN_URLS` 中的网页地址改为实际 HTTPS 地址。建议开发和生产分别创建 OAuth App。
+如需使用网页开发模式登录，将网页的完整返回地址加入后端 `GITHUB_RETURN_URLS`；网页和扩展均使用源码中固定的后端地址。
 
 如需自定义配置，将 `.env.server.example` 复制为 `.env.server`；开发和生产启动命令都会读取它。环境变量优先于文件配置，无效配置会使启动失败并打印原因。
 
@@ -98,7 +100,7 @@ pnpm server:start
 
 构建将后端业务代码合并为 `server-dist/index.mjs`，Fastify、Zod 等第三方依赖保持外部引用。生成的 `browser-tabs-server.tar.gz` 包含后端产物、`package.json`、`pnpm-lock.yaml`、`pnpm-workspace.yaml`、部署模板和文档。服务器安装 Node.js 24 和 pnpm 后，在解压目录执行 `pnpm install --prod --frozen-lockfile` 安装生产依赖，再启动后端；无需上传 TypeScript 源码或本机 `node_modules`。单独运行时可执行 `node --env-file=.env.server server-dist/index.mjs`；systemd 部署使用 `/etc/blank-backup.env`。`pnpm verify:server` 会在项目外的独立目录解压部署包、安装生产依赖，检查 HTTP、CORS、参数校验和重启后的 SQLite 数据保留。
 
-部署时持久化 `DATABASE_PATH` 所在目录，通过 HTTPS 反向代理将 `/api/v1/` 转发到后端。插件填写代理域名，例如 `https://backup.example.com`；这个地址必须能被使用插件的设备访问，`127.0.0.1` 仅指向当前设备。SQLite 使用 WAL，维护备份时应停服后复制整个数据库目录，或使用 SQLite 的在线备份工具，不要在运行中仅复制主数据库文件。
+部署时持久化 `DATABASE_PATH` 所在目录，通过 `https://tabsapi.lianhb.site` 的 HTTPS 反向代理将 `/api/v1/` 转发到后端。SQLite 使用 WAL，维护备份时应停服后复制整个数据库目录，或使用 SQLite 的在线备份工具，不要在运行中仅复制主数据库文件。
 
 Debian 12 的安装、上传、systemd 常驻运行、Nginx HTTPS 和数据维护步骤见 [部署文档](docs/deploy-debian12.md)，配置模板位于 `deploy/`。
 

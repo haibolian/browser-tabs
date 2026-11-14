@@ -1,5 +1,4 @@
-import { afterAll, beforeAll, expect, it } from 'vitest'
-import { CloudApi } from '../src/lib/cloud-api'
+import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { createWorkspace } from '../src/lib/workspace'
 import { createApp } from './app'
 import { githubConfig, installGitHubFixture } from './testing/github-fixture'
@@ -7,19 +6,24 @@ import { codeChallenge, createSecret } from './auth'
 
 const app = createApp({ databasePath: ':memory:', github: githubConfig })
 let baseUrl: string
+let CloudApi: typeof import('../src/lib/cloud-api').CloudApi
 let fixture: ReturnType<typeof installGitHubFixture>
 beforeAll(async () => {
   fixture = installGitHubFixture()
   baseUrl = await app.listen({ host: '127.0.0.1', port: 0 })
+  vi.doMock('../src/lib/cloud-server', () => ({ CLOUD_SERVER_URL: baseUrl }))
+  const clientModule = await import('../src/lib/cloud-api')
+  CloudApi = clientModule.CloudApi
 })
 afterAll(async () => {
   await app.close()
   fixture.mockRestore()
+  vi.doUnmock('../src/lib/cloud-server')
 })
 
 it('插件客户端通过真实 HTTP 完成 OAuth 握手、备份、恢复、删除和退出', async () => {
   const signIn = async () => {
-    const api = new CloudApi(baseUrl)
+    const api = new CloudApi()
     const verifier = createSecret()
     const start = await api.startGitHubLogin(githubConfig.returnUrls[0], codeChallenge(verifier))
     const callback = await fetch(
@@ -30,7 +34,7 @@ it('插件客户端通过真实 HTTP 完成 OAuth 握手、备份、恢复、删
     return api.completeGitHubLogin(start.state, 'alice', verifier)
   }
   const session = await signIn()
-  const client = new CloudApi(baseUrl, session)
+  const client = new CloudApi(session)
   const backup = {
     format: 'blank-backup' as const,
     version: 1 as const,

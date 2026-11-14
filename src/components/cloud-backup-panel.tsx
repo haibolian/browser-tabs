@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Cloud, Github, LoaderCircle, RefreshCw, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import {
   Dialog,
   DialogContent,
@@ -32,7 +31,6 @@ export function CloudBackupPanel({
   connectionError: string | null
   cloudUpload: CloudUpload
 }) {
-  const [baseUrl, setBaseUrl] = useState(connection?.baseUrl ?? 'http://127.0.0.1:3001')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [backups, setBackups] = useState<CloudBackup[] | null>(null)
@@ -43,7 +41,7 @@ export function CloudBackupPanel({
   useEffect(() => {
     if (!connection) return
     let alive = true
-    const api = new CloudApi(connection.baseUrl, connection.session)
+    const api = new CloudApi(connection.session)
     api.listBackups().then(
       (items) => {
         if (alive) {
@@ -72,7 +70,7 @@ export function CloudBackupPanel({
   const loading = connection !== loadedConnection
   const disabled = busy || loading
 
-  async function run(action: () => Promise<void>) {
+  async function run(action: () => Promise<unknown>) {
     setBusy(true)
     setError(null)
     try {
@@ -86,7 +84,7 @@ export function CloudBackupPanel({
 
   function api() {
     if (!connection) throw new Error('请先登录')
-    return new CloudApi(connection.baseUrl, connection.session)
+    return new CloudApi(connection.session)
   }
 
   return (
@@ -99,31 +97,11 @@ export function CloudBackupPanel({
         )}
       </h3>
       {!connection ? (
-        <form
-          className="mt-4 space-y-3"
-          onSubmit={(event) => {
-            event.preventDefault()
-            void run(async () => {
-              await signInWithGitHub(baseUrl)
-            })
-          }}
-        >
-          <label className="block space-y-1.5 text-xs">
-            <span>服务器地址</span>
-            <Input
-              type="url"
-              required
-              value={baseUrl}
-              onChange={(event) => setBaseUrl(event.target.value)}
-              disabled={busy}
-            />
-          </label>
-          <div className="flex items-center gap-2">
-            <Button type="submit" size="sm" disabled={busy}>
-              <Github size={14} /> 使用 GitHub 登录
-            </Button>
-          </div>
-        </form>
+        <div className="mt-4">
+          <Button size="sm" disabled={busy} onClick={() => void run(signInWithGitHub)}>
+            <Github size={14} /> 使用 GitHub 登录
+          </Button>
+        </div>
       ) : (
         <div className="mt-4 space-y-3">
           <div className="rounded-xl bg-primary/4 p-3 text-xs">

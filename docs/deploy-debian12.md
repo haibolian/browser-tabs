@@ -64,7 +64,9 @@ ln -sfn "$release" /opt/browser-tabs/current
 
 ```bash
 id blank-backup >/dev/null 2>&1 || useradd --system --user-group --home-dir /var/lib/blank-backup --no-create-home --shell /usr/sbin/nologin blank-backup
-install -m 600 /opt/browser-tabs/current/deploy/server.env.example /etc/blank-backup.env
+if [ ! -e /etc/blank-backup.env ]; then
+  install -m 600 /opt/browser-tabs/current/deploy/server.env.example /etc/blank-backup.env
+fi
 nano /etc/blank-backup.env
 ```
 
@@ -85,9 +87,10 @@ GITHUB_RETURN_URLS=https://nplbljhenhbjjccehgckeanlbiknanoe.chromiumapp.org/gith
 ```bash
 install -m 644 /opt/browser-tabs/current/deploy/blank-backup.service /etc/systemd/system/blank-backup.service
 systemctl daemon-reload
-systemctl enable --now blank-backup
+systemctl enable blank-backup
+systemctl restart blank-backup
 systemctl status blank-backup --no-pager
-curl -fsS http://127.0.0.1:3001/api/v1/health
+curl --retry 5 --retry-connrefused --retry-delay 1 -fsS http://127.0.0.1:3001/api/v1/health
 ```
 
 健康检查应返回 `{"status":"ok"}`。查看日志：
@@ -135,7 +138,7 @@ certbot renew --dry-run
 
 如果还需继续使用本机后端的 OAuth 登录，为服务器单独创建一个 OAuth App，并把它的 Client ID/Secret 填到 `/etc/blank-backup.env`。
 
-打开插件的「设置 → 数据备份 → 云端备份」。如果已连接本机后端，先退出登录，再将服务器地址填为 `https://backup.example.com`，不带 `/api/v1`。点击 GitHub 登录并允许扩展访问这个服务器，随后点击一次「立即上传」保存当前桌面。其他设备登录同一 GitHub 账号后手动拉取备份。
+插件固定连接 `https://tabsapi.lianhb.site`，上文的示例域名应替换为该域名。打开「设置 → 数据备份 → 云端备份」，点击 GitHub 登录并允许扩展访问后端，随后点击一次「立即上传」保存当前桌面。其他设备登录同一 GitHub 账号后手动拉取备份。旧版本保存的其他服务器登录信息需要重新登录。
 
 首次部署会创建新的服务器数据库。当前电脑的桌面可以直接上传；若需迁移旧的云端历史备份，先停止本机后端，再将本机 `server/data/` 中的数据库及同名 WAL/SHM 文件复制到服务器 `/var/lib/blank-backup/`。复制前停止服务器上的 `blank-backup` 服务，保留服务器原数据库副本，复制后设置目录归属为 `blank-backup:blank-backup`，然后启动服务。
 

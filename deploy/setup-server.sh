@@ -28,4 +28,4 @@ if [[ $deploy_user != root ]]; then
 fi
 systemctl daemon-reload
 systemctl enable blank-backup
-echo 'Service initialized. Fill /etc/blank-backup.env, then run the GitHub deployment workflow.'
+echo 'Service initialized. Fill /etc/blank-backup.env, then deploy a release manually or through GitHub Actions.'

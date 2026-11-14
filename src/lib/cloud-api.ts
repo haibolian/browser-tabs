@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { backupSchema, type Backup } from './backup'
+import { CLOUD_SERVER_URL } from './cloud-server'
 import {
   cloudBackupListSchema,
   cloudBackupSchema,
@@ -12,12 +13,12 @@ import {
 type UploadRequest = Partial<BackupUpload> & { requestId: string; signal?: AbortSignal }
 
 const connectionSchema = z.object({
-  baseUrl: z.string().transform(normalizeServerUrl),
+  baseUrl: z.literal(CLOUD_SERVER_URL),
   session: cloudSessionSchema,
 })
 export type CloudConnection = z.infer<typeof connectionSchema>
 export function cloudUploadTarget(connection: CloudConnection) {
-  return JSON.stringify([connection.baseUrl, connection.session.user.githubId])
+  return JSON.stringify([CLOUD_SERVER_URL, connection.session.user.githubId])
 }
 export const connectionKey = 'blank:cloud-connection'
 const connectionEvent = 'blank:cloud-connection-changed'
@@ -26,12 +27,13 @@ export function readCloudConnection() {
   const stored = localStorage.getItem(connectionKey)
   if (stored === null) return null
   const result = connectionSchema.safeParse(JSON.parse(stored))
-  if (!result.success) throw new Error('本机登录信息已失效，请清除后使用 GitHub 登录')
+  if (!result.success) throw new Error('本机登录信息已失效，请重新使用 GitHub 登录')
   return result.data
 }
 
 export function saveCloudConnection(connection: CloudConnection | null) {
-  if (connection) localStorage.setItem(connectionKey, JSON.stringify(connection))
+  if (connection)
+    localStorage.setItem(connectionKey, JSON.stringify(connectionSchema.parse(connection)))
   else localStorage.removeItem(connectionKey)
   window.dispatchEvent(new Event(connectionEvent))
 }
@@ -48,23 +50,10 @@ export function subscribeCloudConnection(listener: () => void) {
   }
 }
 
-export function normalizeServerUrl(input: string) {
-  const url = new URL(input.trim())
-  if (
-    !['https:', 'http:'].includes(url.protocol) ||
-    url.username ||
-    url.password ||
-    url.search ||
-    url.hash
-  )
-    throw new Error('请输入 http 或 https 服务器地址，不含用户名、密码、查询参数或片段')
-  return url.href.replace(/\/$/, '')
-}
-
 // Called directly from the GitHub login gesture so MV3 can show its permission prompt.
-export async function requestServerAccess(baseUrl: string) {
+export async function requestServerAccess() {
   if (location.protocol !== 'chrome-extension:') return
-  const url = new URL(baseUrl)
+  const url = new URL(CLOUD_SERVER_URL)
   const granted = await chrome.permissions.request({
     origins: [`${url.protocol}//${url.hostname}/*`],
   })
@@ -72,11 +61,9 @@ export async function requestServerAccess(baseUrl: string) {
 }
 
 export class CloudApi {
-  private baseUrl: string
   private session?: CloudSession
 
-  constructor(baseUrl: string, session?: CloudSession) {
-    this.baseUrl = normalizeServerUrl(baseUrl)
+  constructor(session?: CloudSession) {
     this.session = session
   }
 
@@ -86,7 +73,7 @@ export class CloudApi {
     body?: unknown,
     upload?: UploadRequest,
   ): Promise<unknown> {
-    const response = await fetch(`${this.baseUrl}/api/v1${path}`, {
+    const response = await fetch(`${CLOUD_SERVER_URL}/api/v1${path}`, {
       method,
       credentials: 'omit',
       redirect: 'error',
@@ -102,9 +89,7 @@ export class CloudApi {
     })
     if (!response.ok) {
       if (!response.headers.get('content-type')?.includes('application/json'))
-        throw new Error(
-          `服务器返回 HTTP ${response.status}，响应不是 JSON，请检查服务器地址及反向代理配置`,
-        )
+        throw new Error(`服务器返回 HTTP ${response.status}，响应格式错误`)
       const result: unknown = await response.json()
       const { error } = z.object({ error: z.string() }).parse(result)
       throw new Error(error)
@@ -113,7 +98,7 @@ export class CloudApi {
       response.status !== 204 &&
       !response.headers.get('content-type')?.includes('application/json')
     )
-      throw new Error('服务器未返回 JSON 数据，请检查是否填写了后端 API 的地址')
+      throw new Error('服务器响应格式错误')
     return response.status === 204 ? undefined : response.json()
   }
 

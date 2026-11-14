@@ -18,7 +18,7 @@ export function useCloudUpload(connection: CloudConnection | null) {
   const uploader = useMemo(() => {
     if (!connection) return null
     const target = cloudUploadTarget(connection)
-    const api = new CloudApi(connection.baseUrl, connection.session)
+    const api = new CloudApi(connection.session)
     return new CloudUploader({
       load: () => loadCloudUpload(target),
       upload: async (job, signal) =>

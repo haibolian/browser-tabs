@@ -46,7 +46,7 @@ sudo nano /etc/blank-backup.env
 
 路径、用户名与仓库 Variables 保持一致。脚本创建部署目录和运行账户，安装并启用 systemd 服务；已有的环境配置会保留。部署用户负责上传和安装依赖，服务以 `blank-backup` 账户运行。非 root 部署用户仅获得免密重启 `blank-backup` 服务的 sudo 权限。初始化不启动服务，第一次工作流部署成功后服务开始运行。
 
-环境文件中填写 GitHub OAuth 的 Client ID、Secret 和 HTTPS 回调域名；GitHub OAuth 后台填写同一个回调地址。它们留在服务器，Actions 不需要这些值。健康检查使用 `http://127.0.0.1:3001/api/v1/health`，因此保持 `PORT=3001`。
+环境文件中填写 GitHub OAuth 的 Client ID、Secret 和 HTTPS 回调域名；GitHub OAuth 后台填写同一个回调地址。当前插件固定连接 `https://tabsapi.lianhb.site`，回调地址为 `https://tabsapi.lianhb.site/api/v1/auth/github/callback`。这些配置留在服务器，Actions 不需要这些值。健康检查使用 `http://127.0.0.1:3001/api/v1/health`，因此保持 `PORT=3001`。
 
 如果之前使用的是直接解压到 `/opt/browser-tabs` 的手动部署，执行初始化脚本后再运行首次自动部署。新的服务入口为 `/opt/browser-tabs/current/server-dist/index.mjs`。旧目录中的程序可以保留，数据库继续使用环境文件指定的位置。
 

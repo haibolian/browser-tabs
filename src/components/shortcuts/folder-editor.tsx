@@ -1,18 +1,9 @@
 import { useState } from 'react'
-import { FolderClosed } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import {
-  colors,
-  createId,
-  groupAllShortcuts,
-  type Folder,
-  type UpdateWorkspace,
-} from '@/lib/workspace'
-import { IconColorPicker } from './icon-color-picker'
+import { createId, type Folder, type UpdateWorkspace } from '@/lib/workspace'
 
 export function FolderEditor({
   item,
@@ -24,8 +15,6 @@ export function FolderEditor({
   onClose: () => void
 }) {
   const [title, setTitle] = useState(item?.title ?? '')
-  const [color, setColor] = useState(item?.color ?? colors[0])
-  const [groupAll, setGroupAll] = useState(false)
   const [error, setError] = useState('')
   return (
     <Dialog
@@ -50,51 +39,25 @@ export function FolderEditor({
               id: item?.id ?? createId(),
               kind: 'folder',
               title: title.trim(),
-              color,
+              color: item?.color ?? '#82976d',
               items: item?.items ?? [],
             }
             update((state) => ({
               ...state,
-              items: groupAll
-                ? groupAllShortcuts(state.items, folder)
-                : item
-                  ? state.items.map((entry) => (entry.id === item.id ? folder : entry))
-                  : [...state.items, folder],
+              items: item
+                ? state.items.map((entry) =>
+                    entry.id === item.id ? { ...entry, title: folder.title } : entry,
+                  )
+                : [...state.items, folder],
             }))
             toast(item ? '分组修改已保存' : '分组已创建')
             onClose()
           }}
         >
-          <div className="flex justify-center">
-            <span
-              className="flex size-16 items-center justify-center rounded-[18px]"
-              style={{ background: `${color}18`, color }}
-            >
-              <FolderClosed size={30} strokeWidth={1.5} />
-            </span>
-          </div>
           <label className="form-label">
             分组名称
             <Input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} />
           </label>
-          <fieldset>
-            <legend className="mb-3 text-xs text-muted-foreground">分组颜色</legend>
-            <IconColorPicker
-              value={color}
-              label="分组颜色"
-              onChange={(value) => setColor(value!)}
-            />
-          </fieldset>
-          {!item && (
-            <label className="flex cursor-pointer items-center gap-3 rounded-xl bg-primary/4 p-3 text-xs">
-              <Checkbox
-                checked={groupAll}
-                onCheckedChange={(checked) => setGroupAll(checked === true)}
-                aria-label="将所有网站收进这个分组"
-              />
-              将所有网站收进这个分组
-            </label>
-          )}
           {error && (
             <p role="alert" className="text-xs text-destructive">
               {error}

@@ -1,10 +1,8 @@
-import { useState } from 'react'
 import type { useDraggable } from '@dnd-kit/core'
 import {
   FolderClosed,
   FolderInput,
   LayoutGrid,
-  MoreHorizontal,
   Pencil,
   Trash2,
   Ungroup,
@@ -13,15 +11,15 @@ import {
   Maximize2,
 } from 'lucide-react'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
 import type { DesktopItem, Folder } from '@/lib/workspace'
 import { cn } from '@/lib/utils'
 import { SiteIcon } from './site-icon'
@@ -37,6 +35,8 @@ export function ItemVisual({
   height,
   appearance,
   folderInteraction,
+  showLabel = true,
+  mini = false,
 }: {
   item: DesktopItem
   overlay?: boolean
@@ -45,6 +45,8 @@ export function ItemVisual({
   height?: number
   appearance: IconAppearance
   folderInteraction?: FolderInteraction
+  showLabel?: boolean
+  mini?: boolean
 }) {
   return (
     <span
@@ -59,22 +61,23 @@ export function ItemVisual({
           interaction={folderInteraction}
         />
       ) : (
-        <SiteIcon site={item} className="site-icon-fill" />
+        <SiteIcon site={item} mini={mini} className="site-icon-fill" />
       )}
-      {item.kind === 'folder' && folderInteraction ? (
-        <button
-          type="button"
-          tabIndex={-1}
-          {...folderInteraction.drag?.listeners}
-          className="tile-label site-label"
-          aria-label={`展开分组：${item.title}`}
-          onClick={folderInteraction.open}
-        >
-          {item.title}
-        </button>
-      ) : (
-        <span className="tile-label site-label">{item.title}</span>
-      )}
+      {showLabel &&
+        (item.kind === 'folder' && folderInteraction ? (
+          <button
+            type="button"
+            tabIndex={-1}
+            {...folderInteraction.drag?.listeners}
+            className="tile-label site-label"
+            aria-label={`展开分组：${item.title}`}
+            onClick={folderInteraction.open}
+          >
+            {item.title}
+          </button>
+        ) : (
+          <span className="tile-label site-label">{item.title}</span>
+        ))}
     </span>
   )
 }
@@ -103,6 +106,8 @@ export function SiteTile({
   size,
   onResize,
   appearance,
+  compact = false,
+  mini = false,
 }: TileHandlers & {
   item: DesktopItem
   folders: Folder[]
@@ -114,130 +119,127 @@ export function SiteTile({
   size: IconSize
   onResize: (size: IconSize) => void
   appearance: IconAppearance
+  compact?: boolean
+  mini?: boolean
 }) {
-  const [menuOpen, setMenuOpen] = useState(false)
   const className =
     'site-launch flex size-full flex-col items-center rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/50'
   return (
-    <div
-      style={{
-        opacity: isDragging ? 0.25 : 1,
-      }}
-      className={cn(
-        'site-tile group relative flex size-full min-w-0 flex-col items-center rounded-2xl',
-        isOver && item.kind === 'folder' && 'drop-folder',
-      )}
-      onContextMenu={(event) => {
-        event.preventDefault()
-        setMenuOpen(true)
-      }}
-    >
-      {item.kind === 'folder' ? (
-        <ItemVisual
-          item={item}
-          size={size}
-          appearance={appearance}
-          folderInteraction={{ open: () => onOpenFolder(item.id), openInNewTab, drag }}
-        />
-      ) : (
-        <a
-          {...drag?.attributes}
-          {...drag?.listeners}
-          role="link"
-          href={item.url}
-          target={openInNewTab ? '_blank' : '_self'}
-          rel="noreferrer"
-          className={className}
-          aria-label={`打开网站：${item.title}`}
-        >
-          <ItemVisual item={item} size={size} appearance={appearance} />
-        </a>
-      )}
-      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-        <DropdownMenuTrigger asChild>
-          <button
-            className={cn(
-              'absolute -right-1 -top-2 flex size-5 items-center justify-center rounded-full bg-popover/95 text-muted-foreground opacity-0 shadow-sm transition-all hover:text-primary focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100',
-              menuOpen && 'opacity-100',
-            )}
-            aria-label={`${item.title}的更多操作`}
-          >
-            <MoreHorizontal size={12} />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start">
-          {item.kind === 'shortcut' && (
-            <DropdownMenuItem asChild>
-              <a href={item.url} target="_blank" rel="noreferrer">
-                <ExternalLink />
-                在新标签页打开
-              </a>
-            </DropdownMenuItem>
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          style={{
+            opacity: isDragging ? 0.25 : 1,
+          }}
+          className={cn(
+            'site-tile group relative flex size-full min-w-0 flex-col items-center rounded-2xl',
+            isOver && 'drop-folder',
           )}
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
+        >
+          {item.kind === 'folder' ? (
+            <ItemVisual
+              item={item}
+              size={size}
+              appearance={appearance}
+              folderInteraction={{
+                open: () => onOpenFolder(item.id),
+                openInNewTab,
+                drag,
+                folders,
+                handlers: { onOpenFolder, onEdit, onDelete, onMove, onUngroup },
+              }}
+            />
+          ) : (
+            <a
+              {...drag?.attributes}
+              {...drag?.listeners}
+              role="link"
+              href={item.url}
+              target={openInNewTab ? '_blank' : '_self'}
+              rel="noreferrer"
+              draggable={false}
+              className={className}
+              aria-label={`打开网站：${item.title}`}
+            >
+              <ItemVisual item={item} appearance={appearance} showLabel={!compact} mini={mini} />
+            </a>
+          )}
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent aria-label={`${item.title}菜单`}>
+        {item.kind === 'shortcut' && (
+          <ContextMenuItem asChild>
+            <a href={item.url} target="_blank" rel="noreferrer">
+              <ExternalLink />
+              在新标签页打开
+            </a>
+          </ContextMenuItem>
+        )}
+        {!currentFolderId && (
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>
               <Maximize2 />
               布局
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent>
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent>
               {iconSizePresets.map((preset) => (
-                <DropdownMenuItem key={preset.id} onSelect={() => onResize(preset.id)}>
+                <ContextMenuItem key={preset.id} onAction={() => onResize(preset.id)}>
                   <span className="min-w-12">
                     {preset.columns} × {preset.rows}
                   </span>
                   {preset.id === size && <Check className="ml-auto" />}
-                </DropdownMenuItem>
+                </ContextMenuItem>
               ))}
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => onEdit(item)}>
-            <Pencil />
-            {item.kind === 'folder' ? '编辑分组' : '编辑图标'}
-          </DropdownMenuItem>
-          {item.kind === 'shortcut' && (
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger>
-                <FolderInput />
-                移动到
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent>
-                {currentFolderId && (
-                  <DropdownMenuItem onSelect={() => onMove(item.id, null)}>
-                    <LayoutGrid />
-                    桌面
-                  </DropdownMenuItem>
-                )}
-                {folders
-                  .filter((folder) => folder.id !== currentFolderId)
-                  .map((folder) => (
-                    <DropdownMenuItem key={folder.id} onSelect={() => onMove(item.id, folder.id)}>
-                      <FolderClosed />
-                      {folder.title}
-                    </DropdownMenuItem>
-                  ))}
-                {!currentFolderId && !folders.length && (
-                  <DropdownMenuItem disabled>请先新建一个分组</DropdownMenuItem>
-                )}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-          )}
-          {item.kind === 'folder' && (
-            <DropdownMenuItem onSelect={() => onUngroup(item.id)}>
-              <Ungroup />
-              解散分组，保留网站
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="text-destructive focus:bg-destructive/5"
-            onSelect={() => onDelete(item)}
-          >
-            <Trash2 />
-            {item.kind === 'folder' ? '删除分组及网站' : '删除网站'}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+        )}
+        <ContextMenuSeparator />
+        <ContextMenuItem onAction={() => onEdit(item)}>
+          <Pencil />
+          {item.kind === 'folder' ? '编辑分组' : '编辑图标'}
+        </ContextMenuItem>
+        {item.kind === 'shortcut' && (
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>
+              <FolderInput />
+              移动到
+            </ContextMenuSubTrigger>
+            <ContextMenuSubContent>
+              {currentFolderId && (
+                <ContextMenuItem onAction={() => onMove(item.id, null)}>
+                  <LayoutGrid />
+                  桌面
+                </ContextMenuItem>
+              )}
+              {folders
+                .filter((folder) => folder.id !== currentFolderId)
+                .map((folder) => (
+                  <ContextMenuItem key={folder.id} onAction={() => onMove(item.id, folder.id)}>
+                    <FolderClosed />
+                    {folder.title}
+                  </ContextMenuItem>
+                ))}
+              {!currentFolderId && !folders.length && (
+                <ContextMenuItem disabled>请先新建一个分组</ContextMenuItem>
+              )}
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+        )}
+        {item.kind === 'folder' && (
+          <ContextMenuItem onAction={() => onUngroup(item.id)}>
+            <Ungroup />
+            解散分组，保留网站
+          </ContextMenuItem>
+        )}
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          className="text-destructive focus:bg-destructive/5"
+          onAction={() => onDelete(item)}
+        >
+          <Trash2 />
+          {item.kind === 'folder' ? '删除分组及网站' : '删除网站'}
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   )
 }

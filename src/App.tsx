@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ClockSearch } from '@/components/clock-search'
 import { SettingsDialog } from '@/components/settings-dialog'
-import { Shortcuts } from '@/components/shortcuts/shortcuts'
+import { Shortcuts, type ShortcutCommands } from '@/components/shortcuts/shortcuts'
+import { DesktopMenu } from '@/components/shortcuts/desktop-menu'
 import { NotesDialog, NotesWidget } from '@/components/widgets/notes-widget'
 import { TodoDialog, TodoWidget } from '@/components/widgets/todo-widget'
 import { useWorkspace } from '@/hooks/use-workspace'
@@ -114,7 +115,7 @@ function Desktop({
   cloudUpload: CloudUpload
 }) {
   const [panel, setPanel] = useState<'todo' | 'notes' | 'settings' | null>(null)
-  const arrangeRef = useRef<(() => void) | null>(null)
+  const shortcutCommands = useRef<ShortcutCommands | null>(null)
   const resolvedTheme = useTheme(workspace.settings.theme)
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
   const { imageUrl, imageBrightness, imageError } = useWallpaperImage(workspace.settings.imageId)
@@ -162,91 +163,98 @@ function Desktop({
       reducedMotion={workspace.settings.reducedMotion ? 'always' : 'user'}
       transition={{ type: 'spring', stiffness: 300, damping: 28 }}
     >
-      <div
-        style={iconAppearanceStyle(workspace.settings.icons)}
-        className={cn(
-          'desktop relative flex h-dvh min-h-0 flex-col overflow-hidden',
-          workspace.settings.wallpaper === 'uploaded' &&
-            imageBrightness !== null &&
-            (imageBrightness * (1 - workspace.settings.imageDim / 100) < 0.5
-              ? 'dark-wallpaper'
-              : 'light-wallpaper'),
-        )}
+      <DesktopMenu
+        onAdd={() => shortcutCommands.current?.addShortcut()}
+        onNewFolder={() => shortcutCommands.current?.newFolder()}
+        onSettings={() => setPanel('settings')}
       >
-        <AnimatePresence initial={false}>
-          <motion.div
-            key={
-              workspace.settings.wallpaper +
-              resolvedTheme +
-              (workspace.settings.wallpaper === 'uploaded' ? workspace.settings.imageId : '')
-            }
-            className="wallpaper fixed inset-0 -z-20"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.65 }}
-            style={{
-              background: background ? getWallpaperValue(background, resolvedTheme) : undefined,
-              ...(workspace.settings.wallpaper === 'uploaded' && imageUrl
-                ? {
-                    backgroundImage: `url("${imageUrl}")`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                  }
-                : {}),
-            }}
-          />
-        </AnimatePresence>
-        {workspace.settings.wallpaper === 'uploaded' && (
-          <div
-            className="pointer-events-none fixed inset-0 -z-10 bg-black transition-opacity duration-300"
-            style={{ opacity: workspace.settings.imageDim / 100 }}
-          />
-        )}
-        <main
-          style={{ maxWidth: Math.max(1220, workspace.settings.icons.maxWidth + 80) }}
-          className="mx-auto flex min-h-0 w-full flex-1 flex-col px-10 pb-3 pt-5 max-sm:px-5"
+        <div
+          style={iconAppearanceStyle(workspace.settings.icons)}
+          className={cn(
+            'desktop relative flex h-dvh min-h-0 flex-col overflow-hidden',
+            workspace.settings.wallpaper === 'uploaded' &&
+              imageBrightness !== null &&
+              (imageBrightness * (1 - workspace.settings.imageDim / 100) < 0.5
+                ? 'dark-wallpaper'
+                : 'light-wallpaper'),
+          )}
         >
-          {(saveError || imageError) && (
+          <AnimatePresence initial={false}>
+            <motion.div
+              key={
+                workspace.settings.wallpaper +
+                resolvedTheme +
+                (workspace.settings.wallpaper === 'uploaded' ? workspace.settings.imageId : '')
+              }
+              className="wallpaper fixed inset-0 -z-20"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.65 }}
+              style={{
+                filter: `blur(${workspace.settings.wallpaperBlur}px)`,
+                inset: -workspace.settings.wallpaperBlur * 2,
+                background: background ? getWallpaperValue(background, resolvedTheme) : undefined,
+                ...(workspace.settings.wallpaper === 'uploaded' && imageUrl
+                  ? {
+                      backgroundImage: `url("${imageUrl}")`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                    }
+                  : {}),
+              }}
+            />
+          </AnimatePresence>
+          {workspace.settings.wallpaper === 'uploaded' && (
             <div
-              role="alert"
-              className="mx-auto mb-3 flex max-w-xl items-center justify-between gap-3 rounded-xl border border-amber-300/50 bg-amber-50/90 px-4 py-2.5 text-xs text-amber-900"
-            >
-              <span>{saveError || imageError}</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={saveError ? retrySave : () => setPanel('settings')}
+              className="pointer-events-none fixed inset-0 -z-10 bg-black transition-opacity duration-300"
+              style={{ opacity: workspace.settings.imageDim / 100 }}
+            />
+          )}
+          <main
+            style={{ maxWidth: Math.max(1220, workspace.settings.icons.maxWidth + 80) }}
+            className="mx-auto flex min-h-0 w-full flex-1 flex-col px-10 pb-3 pt-5 max-sm:px-5"
+          >
+            {(saveError || imageError) && (
+              <div
+                role="alert"
+                className="mx-auto mb-3 flex max-w-xl items-center justify-between gap-3 rounded-xl border border-amber-300/50 bg-amber-50/90 px-4 py-2.5 text-xs text-amber-900"
               >
-                {saveError ? '重新保存' : '检查壁纸'}
-              </Button>
-            </div>
-          )}
-          <ClockSearch workspace={workspace} update={update} />
-          <Shortcuts
-            workspace={workspace}
-            update={update}
-            widgets={widgets}
-            arrangeRef={arrangeRef}
-            onSettings={() => setPanel('settings')}
-          />
-          {cloudConnection && cloudUpload.state.phase !== 'idle' && (
-            <div className="mx-auto flex shrink-0 items-center gap-3 py-1">
-              <CloudUploadStatus state={cloudUpload.state} />
-              {cloudUpload.state.phase === 'error' && (
-                <>
-                  <Button variant="ghost" size="sm" onClick={cloudUpload.retry}>
-                    重试上传
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setPanel('settings')}>
-                    云端备份
-                  </Button>
-                </>
-              )}
-            </div>
-          )}
-        </main>
-      </div>
+                <span>{saveError || imageError}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={saveError ? retrySave : () => setPanel('settings')}
+                >
+                  {saveError ? '重新保存' : '检查壁纸'}
+                </Button>
+              </div>
+            )}
+            <ClockSearch workspace={workspace} update={update} />
+            <Shortcuts
+              workspace={workspace}
+              update={update}
+              widgets={widgets}
+              commandsRef={shortcutCommands}
+            />
+            {cloudConnection && cloudUpload.state.phase !== 'idle' && (
+              <div className="mx-auto flex shrink-0 items-center gap-3 py-1">
+                <CloudUploadStatus state={cloudUpload.state} />
+                {cloudUpload.state.phase === 'error' && (
+                  <>
+                    <Button variant="ghost" size="sm" onClick={cloudUpload.retry}>
+                      重试上传
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setPanel('settings')}>
+                      云端备份
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
+          </main>
+        </div>
+      </DesktopMenu>
       <TodoDialog
         open={panel === 'todo'}
         onOpenChange={(open) => {
@@ -278,7 +286,7 @@ function Desktop({
         onImport={onImport}
         imageUrl={imageUrl}
         resolvedTheme={resolvedTheme}
-        onArrangeDesktop={() => arrangeRef.current?.()}
+        onArrangeDesktop={() => shortcutCommands.current?.arrange()}
         cloudConnection={cloudConnection}
         connectionError={connectionError}
         cloudUpload={cloudUpload}

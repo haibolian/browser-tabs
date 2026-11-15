@@ -169,6 +169,26 @@ export function WallpaperPanel({
           </button>
         </TabsContent>
       </Tabs>
+      <div className="mt-6 border-t border-border pt-5">
+        <label
+          htmlFor="wallpaper-blur"
+          className="mb-3 flex items-center justify-between text-xs text-muted-foreground"
+        >
+          <span>壁纸模糊</span>
+          <span>{workspace.settings.wallpaperBlur} px</span>
+        </label>
+        <Slider
+          id="wallpaper-blur"
+          aria-label="壁纸模糊"
+          min={0}
+          max={30}
+          step={1}
+          value={[workspace.settings.wallpaperBlur]}
+          onValueChange={([value]) =>
+            update((state) => ({ ...state, settings: { ...state.settings, wallpaperBlur: value } }))
+          }
+        />
+      </div>
       {workspace.settings.wallpaper === 'uploaded' && (
         <div className="mt-6 border-t border-border pt-5">
           <label

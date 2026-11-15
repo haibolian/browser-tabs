@@ -1,0 +1,52 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createDragExitTimer } from './drag-exit'
+
+afterEach(() => vi.useRealTimers())
+
+describe('拖出分组弹窗的容错时间', () => {
+  it('在外部停留满 500ms才关闭', () => {
+    vi.useFakeTimers()
+    const close = vi.fn()
+    const timer = createDragExitTimer(close)
+    timer.update(true)
+    vi.advanceTimersByTime(499)
+    expect(close).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect(close).toHaveBeenCalledTimes(1)
+  })
+  it('在外部持续移动不会重新计时', () => {
+    vi.useFakeTimers()
+    const close = vi.fn()
+    const timer = createDragExitTimer(close)
+    timer.update(true)
+    vi.advanceTimersByTime(300)
+    timer.update(true)
+    vi.advanceTimersByTime(200)
+    expect(close).toHaveBeenCalledTimes(1)
+  })
+  it('容错时间内移回弹窗会取消关闭，再次移出重新计时', () => {
+    vi.useFakeTimers()
+    const close = vi.fn()
+    const timer = createDragExitTimer(close)
+    timer.update(true)
+    vi.advanceTimersByTime(400)
+    timer.update(false)
+    vi.advanceTimersByTime(1000)
+    expect(close).not.toHaveBeenCalled()
+    timer.update(true)
+    vi.advanceTimersByTime(499)
+    expect(close).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect(close).toHaveBeenCalledTimes(1)
+  })
+  it('取消拖拽或卸载弹窗时清理计时', () => {
+    vi.useFakeTimers()
+    const close = vi.fn()
+    const timer = createDragExitTimer(close)
+    timer.update(true)
+    vi.advanceTimersByTime(250)
+    timer.cancel()
+    vi.advanceTimersByTime(1000)
+    expect(close).not.toHaveBeenCalled()
+  })
+})

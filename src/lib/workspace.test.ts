@@ -3,7 +3,6 @@ import {
   createWorkspace,
   findShortcut,
   getDesktopOrder,
-  groupAllShortcuts,
   moveShortcut,
   normalizeUrl,
   removeShortcut,
@@ -48,29 +47,6 @@ describe('网站与分组', () => {
     expect(() => moveShortcut(createWorkspace().items, 'missing', null)).toThrow(
       '找不到要移动的网站',
     )
-  })
-  it('将所有网站集中到一个分组，展开旧分组且保持顺序', () => {
-    const group: Folder = {
-      id: 'all',
-      kind: 'folder',
-      title: '所有网站',
-      color: '#406956',
-      items: [],
-    }
-    const result = groupAllShortcuts(createWorkspace().items, group)
-    expect(result).toHaveLength(1)
-    expect(result[0].items.map((item) => item.id)).toEqual([
-      'github',
-      'figma',
-      'notion',
-      'bilibili',
-      'chatgpt',
-      'mdn',
-      'react',
-      'shadcn',
-      'vite',
-    ])
-    expect(new Set(result[0].items.map((item) => item.id)).size).toBe(9)
   })
   it('解散分组时保留所有网站及原有位置', () => {
     const result = ungroupFolder(createWorkspace().items, 'tools')

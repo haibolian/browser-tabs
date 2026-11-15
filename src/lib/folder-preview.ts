@@ -73,7 +73,7 @@ export function getFolderPreview(
         top: startY + slot + rowGap + inset + Math.floor((index - 3) / 2) * (side + gap),
         size: side,
         radius: radius(side, 2.5),
-        direct: false,
+        direct: true,
         mini: true,
       })
     }

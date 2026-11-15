@@ -111,6 +111,7 @@ export const workspaceSchema = z
         ]),
         imageId: z.string().nullable(),
         imageDim: z.number().min(0).max(60),
+        wallpaperBlur: z.number().min(0).max(30).default(0),
         searchEngine: z.enum(['bing', 'google', 'baidu']),
         openInNewTab: z.boolean(),
         showSeconds: z.boolean(),
@@ -224,6 +225,7 @@ export function createWorkspace(): Workspace {
       wallpaper: 'morning',
       imageId: null,
       imageDim: 10,
+      wallpaperBlur: 0,
       searchEngine: 'bing',
       openInNewTab: true,
       showSeconds: false,
@@ -326,12 +328,6 @@ export function getDesktopOrder(saved: string[], available: string[]): string[] 
   const valid = new Set(available)
   const ordered = [...new Set(saved)].filter((id) => valid.has(id))
   return [...ordered, ...available.filter((id) => !ordered.includes(id))]
-}
-
-export function groupAllShortcuts(items: DesktopItem[], folder: Folder): Folder[] {
-  return [
-    { ...folder, items: items.flatMap((item) => (item.kind === 'folder' ? item.items : [item])) },
-  ]
 }
 
 export const searchEngines = {

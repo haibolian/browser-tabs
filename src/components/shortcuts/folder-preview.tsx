@@ -1,15 +1,80 @@
-import { useLayoutEffect, useRef, useState } from 'react'
-import type { useDraggable } from '@dnd-kit/core'
-import type { Folder } from '@/lib/workspace'
+import { useDraggable, useDroppable } from '@dnd-kit/core'
+import type { Folder, Shortcut } from '@/lib/workspace'
+import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import type { IconSize } from '@/lib/desktop-layout'
 import type { IconAppearance } from '@/lib/icon-appearance'
 import { getFolderPreview } from '@/lib/folder-preview'
 import { SiteIcon } from './site-icon'
+import { SiteTile, type TileHandlers } from './site-tile'
+import { useShortcutDrag } from './shortcut-drag-context'
 
 export type FolderInteraction = {
   open: () => void
   openInNewTab: boolean
   drag?: Pick<ReturnType<typeof useDraggable>, 'attributes' | 'listeners'>
+  folders: Folder[]
+  handlers: TileHandlers
+}
+
+function PreviewShortcut({
+  site,
+  folderId,
+  interaction,
+  appearance,
+  style,
+  index,
+  mini,
+}: {
+  site: Shortcut
+  folderId: string
+  interaction: FolderInteraction
+  appearance: IconAppearance
+  style: CSSProperties
+  index: number
+  mini: boolean
+}) {
+  const { attributes, listeners, setNodeRef } = useDraggable({
+    id: `preview:${folderId}:${site.id}`,
+    data: { item: site, folderId, surface: 'preview', mini },
+  })
+  const drop = useDroppable({
+    id: `preview-target:${folderId}:${site.id}`,
+    data: {
+      previewFolderId: folderId,
+      drop: {
+        kind: 'order',
+        folderId,
+        index,
+      },
+    },
+  })
+  const { activeItem } = useShortcutDrag()
+  return (
+    <span
+      ref={(node) => {
+        setNodeRef(node)
+        drop.setNodeRef(node)
+      }}
+      className="folder-preview-item folder-preview-link absolute"
+      data-folder-index={index}
+      style={{ ...style, opacity: activeItem?.id === site.id ? 0 : 1 }}
+    >
+      <SiteTile
+        {...interaction.handlers}
+        item={site}
+        folders={interaction.folders}
+        currentFolderId={folderId}
+        openInNewTab={interaction.openInNewTab}
+        drag={{ attributes, listeners }}
+        size="1x1"
+        onResize={() => {}}
+        appearance={appearance}
+        compact
+        mini={mini}
+        isOver={drop.isOver && activeItem?.id !== site.id}
+      />
+    </span>
+  )
 }
 
 export function FolderPreview({
@@ -26,13 +91,16 @@ export function FolderPreview({
   const rootRef = useRef<HTMLSpanElement>(null)
   const [bounds, setBounds] = useState<{ width: number; height: number } | null>(null)
   useLayoutEffect(() => {
-    const observer = new ResizeObserver(([entry]) =>
-      setBounds({ width: entry.contentRect.width, height: entry.contentRect.height }),
-    )
-    observer.observe(rootRef.current!)
+    const node = rootRef.current!
+    const measure = () => {
+      const rect = node.getBoundingClientRect()
+      setBounds({ width: rect.width, height: rect.height })
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(node)
     return () => observer.disconnect()
   }, [])
-  // Measure the actual animated box, so resizing never stretches a child icon.
   const items =
     bounds?.width && bounds.height
       ? getFolderPreview(size, bounds.width, bounds.height, folder.items.length, appearance)
@@ -64,22 +132,17 @@ export function FolderPreview({
           height: item.size,
           borderRadius: item.radius,
         }
-        const icon = <SiteIcon site={site} mini={item.mini} className="site-icon-fill" />
         return item.direct && interaction ? (
-          <a
+          <PreviewShortcut
             key={site.id}
-            href={site.url}
-            target={interaction.openInNewTab ? '_blank' : '_self'}
-            rel="noreferrer"
-            draggable={false}
-            title={site.title}
-            aria-label={`打开分组网站：${site.title}`}
-            className="folder-preview-item folder-preview-link absolute"
-            data-folder-index={item.index}
+            site={site}
+            folderId={folder.id}
+            interaction={interaction}
+            appearance={appearance}
+            index={item.index}
+            mini={item.mini}
             style={style}
-          >
-            {icon}
-          </a>
+          />
         ) : (
           <span
             key={site.id}
@@ -88,7 +151,7 @@ export function FolderPreview({
             style={style}
             aria-hidden
           >
-            {icon}
+            <SiteIcon site={site} mini={item.mini} className="site-icon-fill" />
           </span>
         )
       })}

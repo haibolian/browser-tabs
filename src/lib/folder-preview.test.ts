@@ -6,10 +6,10 @@ import { iconAppearanceSchema } from './icon-appearance'
 const appearance = iconAppearanceSchema.parse({})
 
 describe('分组预览', () => {
-  it('2×2 显示前三个可点击大图标，其余四个合并在右下角', () => {
+  it('2×2 显示三个大图标和四个小图标，每个均可独立操作', () => {
     const items = getFolderPreview('2x2', 150, 150, 10, appearance)
     expect(items.map((item) => item.index)).toEqual([0, 1, 2, 3, 4, 5, 6])
-    expect(items.filter((item) => item.direct).map((item) => item.index)).toEqual([0, 1, 2])
+    expect(items.every((item) => item.direct)).toBe(true)
     expect(items.slice(3).every((item) => item.mini && item.left > 75 && item.top > 75)).toBe(true)
     expect(items[3].size).toBeLessThan(items[0].size / 2)
   })

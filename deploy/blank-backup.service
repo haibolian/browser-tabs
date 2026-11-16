@@ -19,6 +19,8 @@ UMask=0077
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
+# SQLite needs a writable temporary directory while pruning backups.
+PrivateTmp=true
 
 [Install]
 WantedBy=multi-user.target

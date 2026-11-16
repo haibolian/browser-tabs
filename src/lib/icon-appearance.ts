@@ -1,3 +1,4 @@
+import { prepareImage } from './image-processing'
 import { z } from 'zod'
 import type { CSSProperties } from 'react'
 
@@ -66,17 +67,12 @@ export function initialIconText(title: string) {
 
 export async function readIconImage(file: File): Promise<string> {
   if (!file.type.startsWith('image/')) throw new Error('请选择图片文件')
+  const { blob } = await prepareImage(file, 256, 256)
   const data = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(reader.result as string)
     reader.onerror = () => reject(new Error('读取图标图片失败，请重新选择文件'))
-    reader.readAsDataURL(file)
-  })
-  await new Promise<void>((resolve, reject) => {
-    const image = new Image()
-    image.onload = () => resolve()
-    image.onerror = () => reject(new Error('这张图片无法显示，请选择有效的图片文件'))
-    image.src = data
+    reader.readAsDataURL(blob)
   })
   return data
 }

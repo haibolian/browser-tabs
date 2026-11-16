@@ -103,7 +103,7 @@ export function migrateDatabase(db: DatabaseSync, path: string) {
       PRAGMA user_version = 4;`)
     db.exec('COMMIT')
   } catch (error) {
-    db.exec('ROLLBACK')
+    if (db.isTransaction) db.exec('ROLLBACK')
     throw error
   }
 }

@@ -2,6 +2,7 @@ import { openDB } from 'idb'
 import { workspaceSchema, type Settings, type Workspace } from './workspace'
 import { importInfinityBackup, type ImportedBackup } from './infinity-backup'
 import { backupSchema } from './backup'
+import { prepareImage } from './image-processing'
 import { cloudBackupSchema, type BackupUpload, type CloudBackup } from './cloud-contract'
 import type { CloudUploadJob, CloudUploadRecord } from './cloud-upload'
 
@@ -110,8 +111,21 @@ export async function acknowledgeCloudUpload(
   notifyCloudUploads()
 }
 
-export async function saveImage(id: string, file: Blob) {
-  await (await database).put('images', file, id)
+export async function saveImage(id: string, file: Blob, brightness?: number) {
+  const transaction = (await database).transaction('images', 'readwrite')
+  await transaction.store.put(file, id)
+  if (brightness !== undefined) await transaction.store.put(brightness, `${id}:brightness`)
+  else await transaction.store.delete(`${id}:brightness`)
+  await transaction.done
+}
+
+export async function loadWallpaperImage(id: string) {
+  const blob = await loadImage(id)
+  const cached = await (await database).get('images', `${id}:brightness`)
+  if (typeof cached === 'number') return { blob, brightness: cached }
+  const { brightness } = await prepareImage(blob, Infinity, Infinity)
+  await (await database).put('images', brightness, `${id}:brightness`)
+  return { blob, brightness }
 }
 
 export async function loadImage(id: string): Promise<Blob> {
@@ -139,7 +153,9 @@ export async function exportWorkspace(workspace: Workspace) {
 
 export async function importWorkspace(raw: string, settings?: Settings): Promise<ImportedBackup> {
   const parsed = JSON.parse(raw)
-  if (parsed?.version === 'v2' && parsed?.data?.site) return importInfinityBackup(parsed, settings)
+  if (parsed?.version === 'v2' && parsed?.data?.site) {
+    return importInfinityBackup(parsed, settings)
+  }
   if (parsed?.format !== 'blank-backup' || parsed?.version !== 1)
     throw new Error('请选择有效的留白或 Infinity v2 备份文件')
   const backup = backupSchema.parse(parsed)

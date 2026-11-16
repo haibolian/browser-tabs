@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { saveImage } from '@/lib/storage'
+import { prepareImage } from '@/lib/image-processing'
 import {
   createId,
   wallpapers,
@@ -33,10 +34,13 @@ export function WallpaperPanel({
   async function upload(file: File) {
     setUploading(true)
     try {
-      const bitmap = await createImageBitmap(file)
-      bitmap.close()
+      const { blob, brightness } = await prepareImage(
+        file,
+        Math.max(1920, Math.min(7680, screen.width * devicePixelRatio)),
+        Math.max(1080, Math.min(4320, screen.height * devicePixelRatio)),
+      )
       const id = createId()
-      await saveImage(id, file)
+      await saveImage(id, blob, brightness)
       update((state) => ({
         ...state,
         settings: { ...state.settings, imageId: id, wallpaper: 'uploaded' },
@@ -81,7 +85,7 @@ export function WallpaperPanel({
                   >
                     <span
                       className={cn(
-                        'relative flex h-[82px] items-center justify-center rounded-2xl border-2 border-surface-border/65 transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-md group-focus-visible:ring-2 group-focus-visible:ring-primary',
+                        'wallpaper-option relative flex h-[82px] items-center justify-center rounded-2xl border-2 border-surface-border/65 transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-md group-focus-visible:ring-2 group-focus-visible:ring-primary',
                         workspace.settings.wallpaper === wallpaper.id &&
                           'ring-2 ring-primary/60 ring-offset-2 ring-offset-surface',
                       )}
@@ -116,7 +120,12 @@ export function WallpaperPanel({
           />
           {imageUrl && (
             <div className="relative mb-4 overflow-hidden rounded-2xl">
-              <img src={imageUrl} alt="已上传的壁纸" className="h-40 w-full object-cover" />
+              <img
+                src={imageUrl}
+                alt="已上传的壁纸"
+                decoding="async"
+                className="h-40 w-full object-cover"
+              />
               <div className="absolute inset-0 bg-black/5" />
               <Button
                 variant="secondary"

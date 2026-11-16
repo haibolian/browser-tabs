@@ -1,9 +1,10 @@
 import { z } from 'zod'
 import { isSiteIconUrl } from './site-metadata'
 import { colorModes, type ResolvedTheme } from './theme'
-import { iconAppearanceSchema, iconBackgroundSchema } from './icon-appearance'
+import { iconAppearanceSchema, iconBackgroundSchema, iconColorSchema } from './icon-appearance'
 import { iconSizePresets, widgetSizePresets } from './desktop-layout'
 import { iconNames } from './icon-presets'
+import { migrateIconName } from './icon-migration'
 
 export const colors = [
   '#406956',
@@ -29,10 +30,11 @@ export const shortcutSchema = z
     kind: z.literal('shortcut'),
     title: z.string().min(1),
     url: websiteUrl,
-    icon: z.enum(iconNames),
+    icon: z.preprocess(migrateIconName, z.enum(iconNames)),
     iconSource: z.enum(['site', 'preset', 'text', 'upload']).default('preset'),
     favicon: z.string().refine(isSiteIconUrl, '网站图标地址无效').nullable().default(null),
     iconText: z.string().default(''),
+    iconTextColor: iconColorSchema.optional(),
     iconBackground: iconBackgroundSchema.default('#ffffff'),
     uploadedIcon: z
       .string()

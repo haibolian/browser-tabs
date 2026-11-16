@@ -1,11 +1,26 @@
 import 'fake-indexeddb/auto'
 import { afterAll, expect, it, vi } from 'vitest'
-import { acknowledgeCloudUpload, loadCloudUpload, loadWorkspace, saveWorkspace } from './storage'
+import {
+  acknowledgeCloudUpload,
+  loadCloudUpload,
+  loadWorkspace,
+  saveWorkspace,
+  loadWallpaperImage,
+  saveImage,
+} from './storage'
 import { createWorkspace } from './workspace'
 
 // IndexedDB is exercised through its normal transaction API; only the DOM event target is supplied.
 vi.stubGlobal('window', new EventTarget())
 afterAll(() => vi.unstubAllGlobals())
+
+it('已分析的壁纸重开时使用缓存亮度和原图片，不再次解码', async () => {
+  const blob = new Blob(['image'], { type: 'image/webp' })
+  await saveImage('cached-wallpaper', blob, 0.42)
+  const loaded = await loadWallpaperImage('cached-wallpaper')
+  expect(loaded.brightness).toBe(0.42)
+  expect(await loaded.blob.text()).toBe('image')
+})
 
 it('本机保存和待上传内容一起持久化，重新读取时保留原请求标识', async () => {
   const workspace = createWorkspace()

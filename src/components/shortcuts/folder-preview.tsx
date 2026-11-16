@@ -92,12 +92,15 @@ export function FolderPreview({
   const [bounds, setBounds] = useState<{ width: number; height: number } | null>(null)
   useLayoutEffect(() => {
     const node = rootRef.current!
-    const measure = () => {
-      const rect = node.getBoundingClientRect()
-      setBounds({ width: rect.width, height: rect.height })
+    const measure = (width: number, height: number) => {
+      setBounds((current) =>
+        current?.width === width && current.height === height ? current : { width, height },
+      )
     }
-    measure()
-    const observer = new ResizeObserver(measure)
+    measure(node.clientWidth, node.clientHeight)
+    const observer = new ResizeObserver(([entry]) =>
+      measure(entry.contentRect.width, entry.contentRect.height),
+    )
     observer.observe(node)
     return () => observer.disconnect()
   }, [])
@@ -126,8 +129,9 @@ export function FolderPreview({
       {items.map((item) => {
         const site = folder.items[item.index]
         const style = {
-          left: item.left,
-          top: item.top,
+          left: 0,
+          top: 0,
+          translate: `${item.left}px ${item.top}px`,
           width: item.size,
           height: item.size,
           borderRadius: item.radius,

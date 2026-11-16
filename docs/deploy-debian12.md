@@ -93,13 +93,38 @@ systemctl status blank-backup --no-pager
 curl --retry 5 --retry-connrefused --retry-delay 1 -fsS http://127.0.0.1:3001/api/v1/health
 ```
 
-健康检查应返回 `{"status":"ok"}`。查看日志：
+健康检查应返回 `{"status":"ok"}`。应用日志由 systemd 收集，查看最近 100 行：
 
 ```bash
 journalctl -u blank-backup -n 100 --no-pager
 ```
 
+排查上传失败时，在服务器执行以下命令，再在插件中点击「重试上传」。同一请求的日志共用 `reqId`，`"level":50` 的日志中包含具体异常、堆栈和 SQLite 错误码：
+
+```bash
+sudo journalctl -u blank-backup -f -o cat
+```
+
 修改环境文件后执行 `systemctl restart blank-backup`。
+
+### SQLite 临时目录错误
+
+服务模板使用 `ProtectSystem=strict` 将文件系统设为只读，通过 `StateDirectory` 提供数据库目录，并通过 `PrivateTmp=true` 提供可写的 `/tmp` 和 `/var/tmp`。SQLite 在执行排序和备份清理时可能创建临时文件。
+
+如果上传失败日志中出现 `disk I/O error` 且 `errcode` 为 `6410`（`SQLITE_IOERR_GETTEMPPATH`），表示 SQLite 找不到可写的临时目录。旧版服务缺少 `PrivateTmp` 配置时，在服务器 root shell 执行：
+
+```bash
+mkdir -p /etc/systemd/system/blank-backup.service.d
+cat > /etc/systemd/system/blank-backup.service.d/sqlite-tmp.conf <<'EOF'
+[Service]
+PrivateTmp=true
+EOF
+systemctl daemon-reload
+systemctl restart blank-backup
+systemctl show blank-backup -p PrivateTmp -p ProtectSystem
+```
+
+确认输出 `PrivateTmp=yes` 和 `ProtectSystem=strict`，再在插件中重试上传。
 
 ## 5. 配置 Nginx 和 HTTPS
 

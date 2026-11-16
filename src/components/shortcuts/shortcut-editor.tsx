@@ -1,9 +1,16 @@
-import { useCallback, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useId, useRef, useState, type ReactNode } from 'react'
 import { Check, FolderClosed, Globe2, Loader2, Plus, Type } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useSiteDetails } from '@/hooks/use-site-details'
 import { initialIconText, readIconImage } from '@/lib/icon-appearance'
 import type { SiteMetadata } from '@/lib/site-metadata'
@@ -74,12 +81,14 @@ export function ShortcutEditor({
   const [color, setColor] = useState(item?.color ?? colors[0])
   const [background, setBackground] = useState(item?.iconBackground ?? '#1681ff')
   const [text, setText] = useState(item?.iconText || initialIconText(item?.title ?? '') || 'A')
+  const [textColor, setTextColor] = useState(item?.iconTextColor ?? '#ffffff')
   const [favicon, setFavicon] = useState(item?.favicon ?? null)
   const [uploadedIcon, setUploadedIcon] = useState(item?.uploadedIcon ?? null)
   const [choice, setChoice] = useState<IconChoice>(
     item && ['site', 'upload'].includes(item.iconSource) ? 'current' : (item?.iconSource ?? 'text'),
   )
   const [parentId, setParentId] = useState(initialParentId)
+  const locationId = useId()
   const [error, setError] = useState('')
   const [uploadError, setUploadError] = useState('')
   const [uploading, setUploading] = useState(false)
@@ -129,6 +138,7 @@ export function ShortcutEditor({
     favicon: selectedFavicon,
     uploadedIcon: selectedUpload,
     iconText: text,
+    iconTextColor: textColor,
     iconBackground: background,
   }
 
@@ -172,6 +182,7 @@ export function ShortcutEditor({
         favicon: selectedFavicon,
         uploadedIcon: selectedUpload,
         iconText: text.trim(),
+        iconTextColor: textColor,
         iconBackground: background,
       }
       update((state) => ({ ...state, items: upsertShortcut(state.items, shortcut, parentId) }))
@@ -375,6 +386,16 @@ export function ShortcutEditor({
             {choice === 'preset' && (
               <PresetIconPicker value={icon} color={color} onChange={setIcon} />
             )}
+            {choice === 'text' && (
+              <fieldset>
+                <legend className="mb-3 text-xs text-muted-foreground">文本颜色</legend>
+                <IconColorPicker
+                  value={textColor}
+                  label="文本颜色"
+                  onChange={(value) => setTextColor(value!)}
+                />
+              </fieldset>
+            )}
             <fieldset>
               <legend className="mb-3 text-xs text-muted-foreground">
                 {choice === 'preset' ? '系统图标颜色' : '图标背景色'}
@@ -393,27 +414,31 @@ export function ShortcutEditor({
               />
             </fieldset>
           </div>
-          <label className="flex items-center gap-4 text-xs text-muted-foreground">
-            <span className="shrink-0">放置位置</span>
-            <span className="flex items-center gap-2 rounded-xl border border-input bg-field/50 px-3">
-              <FolderClosed size={14} className="shrink-0" />
-              <select
-                aria-label="网站放置位置"
-                value={parentId ?? ''}
-                onChange={(event) => setParentId(event.target.value || null)}
-                className="h-10 w-full bg-transparent text-sm text-foreground outline-none"
-              >
-                <option value="">桌面</option>
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <label htmlFor={locationId} className="shrink-0">
+              放置位置
+            </label>
+            <Select
+              name="parentId"
+              value={parentId === null ? 'desktop' : `folder:${parentId}`}
+              onValueChange={(value) => setParentId(value === 'desktop' ? null : value.slice(7))}
+            >
+              <SelectTrigger id={locationId} className="w-[220px] max-w-full">
+                <FolderClosed size={14} className="shrink-0 text-muted-foreground" aria-hidden />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="start">
+                <SelectItem value="desktop">桌面</SelectItem>
                 {workspace.items
                   .filter((entry) => entry.kind === 'folder')
                   .map((entry) => (
-                    <option key={entry.id} value={entry.id}>
+                    <SelectItem key={entry.id} value={`folder:${entry.id}`}>
                       {entry.title}
-                    </option>
+                    </SelectItem>
                   ))}
-              </select>
-            </span>
-          </label>
+              </SelectContent>
+            </Select>
+          </div>
           {error && (
             <p role="alert" className="text-xs text-destructive">
               {error}

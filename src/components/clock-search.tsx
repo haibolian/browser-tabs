@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'motion/react'
-import { ArrowRight, ChevronDown, Search } from 'lucide-react'
+import { ArrowRight, Search } from 'lucide-react'
 import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { searchEngines, type Workspace, type UpdateWorkspace } from '@/lib/workspace'
 
 export function ClockSearch({
@@ -31,7 +32,7 @@ export function ClockSearch({
         event.key === '/' &&
         !['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) &&
         !target.isContentEditable &&
-        !document.querySelector('[role="dialog"]')
+        !document.querySelector('[role="dialog"], [role="listbox"]')
       ) {
         event.preventDefault()
         inputRef.current?.focus()
@@ -80,39 +81,37 @@ export function ClockSearch({
         }}
         className="search-bar group mt-6 flex h-[50px] w-full max-w-[580px] items-center rounded-[18px] border border-surface-border/70 bg-card/85 px-2 shadow-[0_6px_30px_-12px_#0000000a] transition-[background-color,box-shadow,transform] duration-300 focus-within:-translate-y-0.5 focus-within:bg-surface/95 focus-within:shadow-[0_10px_40px_-12px_#00000014]"
       >
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              aria-label={`选择搜索引擎，当前${engine.label}`}
-              className="flex h-9 items-center gap-1 rounded-xl px-3 text-muted-foreground transition-colors hover:bg-primary/5"
-            >
+        <Select
+          name="searchEngine"
+          value={workspace.settings.searchEngine}
+          onValueChange={(value) =>
+            update((state) => ({
+              ...state,
+              settings: {
+                ...state.settings,
+                searchEngine: value as Workspace['settings']['searchEngine'],
+              },
+            }))
+          }
+        >
+          <SelectTrigger
+            aria-label={`选择搜索引擎，当前${engine.label}`}
+            className="h-9 w-auto shrink-0 gap-1 border-0 bg-transparent text-muted-foreground hover:bg-primary/5 [&>svg]:size-2.5"
+          >
+            <SelectValue>
               <span className="w-4 text-center font-serif text-lg font-bold text-primary/80">
                 {engine.letter}
               </span>
-              <ChevronDown size={10} className="text-muted-foreground" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent align="start">
             {Object.entries(searchEngines).map(([key, value]) => (
-              <DropdownMenuCheckboxItem
-                key={key}
-                checked={key === workspace.settings.searchEngine}
-                onCheckedChange={() =>
-                  update((state) => ({
-                    ...state,
-                    settings: {
-                      ...state.settings,
-                      searchEngine: key as Workspace['settings']['searchEngine'],
-                    },
-                  }))
-                }
-              >
+              <SelectItem key={key} value={key}>
                 {value.label}
-              </DropdownMenuCheckboxItem>
+              </SelectItem>
             ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+          </SelectContent>
+        </Select>
         <span className="mx-1 h-4 w-px bg-primary/10" />
         <Search size={16} className="ml-3 shrink-0 text-primary/35" />
         <input

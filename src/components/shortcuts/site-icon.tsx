@@ -18,6 +18,7 @@ function IconImage({ url, onError }: { url: string; onError?: () => void }) {
       alt=""
       draggable={false}
       referrerPolicy="no-referrer"
+      decoding="async"
       className="site-icon-image"
       onError={() => {
         setFailed(true)
@@ -62,7 +63,12 @@ function TextIcon({ text }: { text: string }) {
 }
 
 export type SiteIconData = Pick<Shortcut, 'icon' | 'color'> &
-  Partial<Pick<Shortcut, 'favicon' | 'iconSource' | 'iconText' | 'iconBackground' | 'uploadedIcon'>>
+  Partial<
+    Pick<
+      Shortcut,
+      'favicon' | 'iconSource' | 'iconText' | 'iconTextColor' | 'iconBackground' | 'uploadedIcon'
+    >
+  >
 
 export function SiteIcon({
   site,
@@ -96,7 +102,7 @@ export function SiteIcon({
           : site.iconBackground,
         color: preset
           ? `color-mix(in srgb, ${site.color}, var(--icon-tint) var(--icon-tint-amount))`
-          : '#ffffff',
+          : (site.iconTextColor ?? '#ffffff'),
       }}
     >
       {site.iconSource === 'text' ? (

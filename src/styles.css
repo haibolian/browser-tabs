@@ -225,7 +225,7 @@ a:focus-visible {
   top: 50%;
   width: max-content;
   white-space: nowrap;
-  color: #fff;
+  color: inherit;
   font-family:
     'PingFang SC',
     -apple-system,
@@ -281,11 +281,7 @@ a:focus-visible {
   border-radius: inherit;
 }
 .folder-preview-item {
-  transition:
-    left 150ms ease,
-    top 150ms ease,
-    width 150ms ease,
-    height 150ms ease;
+  transition: translate 150ms ease;
 }
 .folder-preview-link .site-icon {
   transition: transform 0.2s ease;
@@ -377,14 +373,36 @@ a:focus-visible {
   letter-spacing: -0.035em;
 }
 .widget-card {
+  position: relative;
+  isolation: isolate;
   box-shadow: var(--widget-shadow);
   transition:
-    box-shadow 0.4s,
     border-color 0.4s,
     background-color 0.4s;
 }
-.widget-card:hover {
+.widget-shadow {
+  position: relative;
+  isolation: isolate;
+  border-radius: 19px;
+}
+.desktop-widget .widget-shadow {
+  border-radius: 17px;
+}
+.widget-shadow::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
   box-shadow: var(--widget-hover-shadow);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s;
+}
+.widget-shadow:hover::before {
+  opacity: 1;
+}
+.widget-card:hover {
   background-color: var(--surface-hover);
 }
 .widget-icon {
@@ -552,12 +570,29 @@ a:focus-visible {
 .site-launch > span > span:first-child {
   transition:
     transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1.2),
-    box-shadow 0.35s,
     background-color 0.35s;
+}
+.site-launch > .site-visual::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--site-icon-radius, 18px);
+  box-shadow: 0 12px 22px -10px #00000026;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.35s,
+    transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1.2);
+}
+.site-launch:hover > .site-visual::before {
+  opacity: 1;
+  transform: translateY(-5px) scale(1.045);
+}
+.site-launch:active > .site-visual::before {
+  transform: translateY(-1px) scale(0.93);
 }
 .site-launch:hover > span > span:first-child {
   transform: translateY(-5px) scale(1.045);
-  box-shadow: 0 12px 22px -10px #00000026;
 }
 .site-launch:active > span > span:first-child {
   transform: translateY(-1px) scale(0.93);
@@ -576,6 +611,11 @@ a:focus-visible {
 .desktop-grid[data-sorting='true'] .folder-preview-link .site-icon {
   transform: none;
   transition: none;
+}
+.desktop-grid[data-sorting='true'] .site-visual::before,
+.shortcut-drag-overlay .site-visual::before,
+.folder-preview-item .site-visual::before {
+  display: none;
 }
 .form-label {
   display: flex;
@@ -688,20 +728,54 @@ a:focus-visible {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  .animate-spin,
+  .animate-pulse {
+    animation: none;
+  }
+  .search-bar:focus-within,
+  .group:hover .wallpaper-option {
+    translate: none;
+  }
+  button[data-slot='button']:active {
+    scale: none;
+  }
+
+  .site-launch:hover > span > span:first-child,
+  .site-launch:active > span > span:first-child,
+  .site-launch > .site-visual::before,
+  .folder-preview-link:hover .site-icon {
+    transform: none;
+  }
+  .desktop-grid [data-grid-id],
+  .folder-preview-item {
+    transition: none !important;
+  }
+  .check-pop {
+    animation: none;
   }
 }
-html[data-reduced-motion='true'] *,
-html[data-reduced-motion='true'] *::before,
-html[data-reduced-motion='true'] *::after {
-  animation-duration: 0.01ms !important;
-  animation-iteration-count: 1 !important;
-  transition-duration: 0.01ms !important;
-  scroll-behavior: auto !important;
+html[data-reduced-motion='true'] .site-launch:hover > span > span:first-child,
+html[data-reduced-motion='true'] .site-launch:active > span > span:first-child,
+html[data-reduced-motion='true'] .site-launch > .site-visual::before,
+html[data-reduced-motion='true'] .folder-preview-link:hover .site-icon {
+  transform: none;
+}
+html[data-reduced-motion='true'] .desktop-grid [data-grid-id],
+html[data-reduced-motion='true'] .folder-preview-item {
+  transition: none !important;
+}
+html[data-reduced-motion='true'] .check-pop {
+  animation: none;
+}
+
+html[data-reduced-motion='true'] .animate-spin,
+html[data-reduced-motion='true'] .animate-pulse {
+  animation: none;
+}
+html[data-reduced-motion='true'] .search-bar:focus-within,
+html[data-reduced-motion='true'] .group:hover .wallpaper-option {
+  translate: none;
+}
+html[data-reduced-motion='true'] button[data-slot='button']:active {
+  scale: none;
 }

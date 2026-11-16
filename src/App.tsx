@@ -23,7 +23,7 @@ import {
   type UpdateWorkspace,
 } from '@/lib/workspace'
 import { useTheme } from '@/hooks/use-theme'
-import { loadImage } from '@/lib/storage'
+import { loadWallpaperImage } from '@/lib/storage'
 import { cn } from '@/lib/utils'
 import { iconAppearanceStyle } from '@/lib/icon-appearance'
 
@@ -53,34 +53,22 @@ function useWallpaperImage(imageId: string | null) {
     if (!imageId) return
     let alive = true
     let objectUrl: string | undefined
-    loadImage(imageId)
-      .then(async (blob) => {
-        const bitmap = await createImageBitmap(blob)
-        const canvas = document.createElement('canvas')
-        canvas.width = 16
-        canvas.height = 16
-        const context = canvas.getContext('2d')
-        if (!context) {
-          bitmap.close()
-          throw new Error('无法分析壁纸颜色')
-        }
-        context.drawImage(bitmap, 0, 0, 16, 16)
-        bitmap.close()
-        const pixels = context.getImageData(0, 0, 16, 16).data
-        let brightness = 0
-        for (let index = 0; index < pixels.length; index += 4) {
-          brightness +=
-            (pixels[index] * 0.2126 + pixels[index + 1] * 0.7152 + pixels[index + 2] * 0.0722) / 255
-        }
-        brightness /= 256
+    async function load() {
+      try {
+        const { blob, brightness } = await loadWallpaperImage(imageId!)
         if (!alive) return
         objectUrl = URL.createObjectURL(blob)
-        setImage({ id: imageId, url: objectUrl, brightness })
+        setImage({ id: imageId!, url: objectUrl, brightness })
         setError(null)
-      })
-      .catch((err: Error) => {
-        if (alive) setError({ id: imageId, message: err.message })
-      })
+      } catch (error) {
+        if (alive)
+          setError({
+            id: imageId!,
+            message: error instanceof Error ? error.message : String(error),
+          })
+      }
+    }
+    void load()
     return () => {
       alive = false
       if (objectUrl) URL.revokeObjectURL(objectUrl)

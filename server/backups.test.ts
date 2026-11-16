@@ -114,6 +114,36 @@ describe('备份合并与保留', () => {
     expect(store.list('alice')).toEqual([first])
   })
 
+  it.each(['manual', 'automatic'] as const)(
+    'SQLite 空间不足自动回滚后保留原始错误和历史，恢复容量后可重试（%s）',
+    (mode) => {
+      const upload = { mode, deviceId: deviceA }
+      const original = backup('first')
+      const first = store.save('alice', original, randomUUID(), upload)
+      const pageLimit = db.prepare('PRAGMA max_page_count').get()!.max_page_count
+      const pages = db.prepare('PRAGMA page_count').get()!.page_count
+      db.exec(`PRAGMA max_page_count = ${pages}`)
+      now++
+      const requestId = randomUUID()
+      const large = backup('x'.repeat(256 * 1024))
+
+      expect(() => store.save('alice', large, requestId, upload)).toThrow(
+        'database or disk is full',
+      )
+      expect(db.isTransaction).toBe(false)
+      expect(store.list('alice')).toEqual([first])
+      expect(store.readBackup('alice', first.id)).toEqual(original)
+      expect(
+        db.prepare('SELECT request_id FROM backup_uploads WHERE request_id = ?').get(requestId),
+      ).toBeUndefined()
+
+      db.exec(`PRAGMA max_page_count = ${pageLimit}`)
+      const saved = store.save('alice', large, requestId, upload)
+      expect(store.readBackup('alice', saved.id)).toEqual(large)
+      expect(store.list('alice')).toHaveLength(mode === 'automatic' ? 1 : 2)
+    },
+  )
+
   it('启动时应用新上限，按账号保留最近的备份', () => {
     const previous = new BackupStore(db, { limit: 100, mergeMinutes: 10 })
     for (let index = 0; index < 25; index++) {

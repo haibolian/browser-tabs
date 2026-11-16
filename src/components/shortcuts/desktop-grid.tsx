@@ -86,14 +86,15 @@ function draggableStyle(
   transform: Transform | null,
 ): CSSProperties {
   return {
-    left: position.left,
-    top: position.top,
+    left: 0,
+    top: 0,
+    translate: `${position.left}px ${position.top}px`,
     width: position.width,
     height: position.height,
     display: position.hidden ? 'none' : undefined,
     transform: dragging && isDragging ? CSS.Translate.toString(transform) : undefined,
     zIndex: dragging && isDragging ? 50 : undefined,
-    transition: dragging && !isDragging ? 'left 150ms, top 150ms' : undefined,
+    transition: dragging && !isDragging ? 'translate 150ms ease' : undefined,
   }
 }
 
@@ -161,7 +162,7 @@ function DraggableSite({
         ...draggableStyle(position, dragging, false, null),
         opacity: hiddenSource ? 0 : 1,
         pointerEvents: hiddenSource ? 'none' : undefined,
-        transition: dragging ? 'left 150ms ease, top 150ms ease' : undefined,
+        transition: dragging ? 'translate 150ms ease' : undefined,
       }}
       className="absolute min-w-0"
     >
@@ -659,7 +660,14 @@ export function DesktopGrid({
             <motion.div
               className="pointer-events-none absolute rounded-2xl border border-primary/20 bg-primary/8"
               initial={false}
-              animate={position({ ...active, ...target.position })}
+              style={{
+                width: active.columns * columnStep - appearance.gapX,
+                height: active.rows * rowStep - appearance.gapY,
+              }}
+              animate={{
+                x: target.position.column * columnStep,
+                y: (target.position.row % rows) * rowStep,
+              }}
               transition={{ duration: 0.12 }}
             />
           )}
@@ -681,6 +689,13 @@ export function DesktopGrid({
                   onResize={(size) => resizeWidget(widget, size)}
                 />
               )
+            // Keep the drag source registered while crossing a page boundary.
+            if (
+              Math.floor(entry.row / rows) !== page &&
+              entry.id !== dragId &&
+              entry.id !== drag.sourceFolderId
+            )
+              return null
             const item = items.find((item) => item.id === entry.id)
             if (item)
               return (

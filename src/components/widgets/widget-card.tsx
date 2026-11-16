@@ -29,13 +29,15 @@ export function WidgetHeader({ children, className }: { children: ReactNode; cla
 
 export function WidgetCard({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <section
-      className={cn(
-        'widget-card flex min-w-0 flex-col rounded-[19px] border border-surface-border/75 bg-card/85 p-4',
-        className,
-      )}
-    >
-      {children}
-    </section>
+    <div className="widget-shadow h-full min-h-0">
+      <section
+        className={cn(
+          'widget-card flex min-w-0 flex-col rounded-[19px] border border-surface-border/75 bg-card/85 p-4',
+          className,
+        )}
+      >
+        {children}
+      </section>
+    </div>
   )
 }

@@ -177,7 +177,8 @@ function TodoList({
           <span className="h-1 w-14 overflow-hidden rounded-full bg-primary/7">
             <motion.span
               className="block h-full rounded-full bg-primary/45"
-              animate={{ width: `${todos.length ? (done / todos.length) * 100 : 0}%` }}
+              style={{ width: '100%', transformOrigin: 'left' }}
+              animate={{ scaleX: todos.length ? done / todos.length : 0 }}
               transition={{ type: 'spring', stiffness: 100, damping: 20 }}
             />
           </span>

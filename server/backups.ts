@@ -144,7 +144,8 @@ export class BackupStore {
       this.db.exec('COMMIT')
       return metadata
     } catch (error) {
-      this.db.exec('ROLLBACK')
+      // SQLite can end the transaction itself after a write failure.
+      if (this.db.isTransaction) this.db.exec('ROLLBACK')
       throw error
     }
   }

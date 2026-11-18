@@ -38,7 +38,10 @@ const schema = `
 
 export function migrateDatabase(db: DatabaseSync, path: string) {
   const version = db.prepare('PRAGMA user_version').get()!.user_version
-  if (version === 4) return
+  if (version === 4) {
+    migratePushDatabase(db)
+    return
+  }
   if (version !== 0 && version !== 1 && version !== 2 && version !== 3)
     throw new Error(`不支持的数据库版本：${version}`)
   db.exec('BEGIN IMMEDIATE')
@@ -101,6 +104,41 @@ export function migrateDatabase(db: DatabaseSync, path: string) {
     db.exec(`DROP INDEX backups_upload_key;
       ALTER TABLE backups DROP COLUMN upload_key;
       PRAGMA user_version = 4;`)
+    db.exec('COMMIT')
+  } catch (error) {
+    if (db.isTransaction) db.exec('ROLLBACK')
+    throw error
+  }
+  migratePushDatabase(db)
+}
+
+function migratePushDatabase(db: DatabaseSync) {
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    // Additive tables keep version 4 compatible with application release rollback.
+    db.exec(`CREATE TABLE IF NOT EXISTS push_tokens (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      suffix TEXT NOT NULL,
+      token_hash TEXT NOT NULL UNIQUE,
+      created_at INTEGER NOT NULL,
+      last_used_at INTEGER
+    ) STRICT;
+    CREATE INDEX IF NOT EXISTS push_tokens_owner ON push_tokens(user_id);
+    CREATE TABLE IF NOT EXISTS push_messages (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      request_key TEXT,
+      payload_hash TEXT NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      read_at INTEGER
+    ) STRICT;
+    CREATE UNIQUE INDEX IF NOT EXISTS push_message_request ON push_messages(user_id, request_key);
+    CREATE INDEX IF NOT EXISTS push_messages_owner ON push_messages(user_id, created_at);
+    CREATE INDEX IF NOT EXISTS push_messages_unread ON push_messages(user_id, read_at, created_at);`)
     db.exec('COMMIT')
   } catch (error) {
     if (db.isTransaction) db.exec('ROLLBACK')

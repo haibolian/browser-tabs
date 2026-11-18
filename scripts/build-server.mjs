@@ -50,6 +50,7 @@ execFileSync(
     'deploy',
     'docs/deploy-debian12.md',
     'docs/github-actions.md',
+    'docs/push-messages.md',
   ],
   { cwd: root, stdio: 'inherit' },
 )

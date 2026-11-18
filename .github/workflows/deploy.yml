@@ -15,7 +15,8 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  build:
+  deploy:
+    name: Check, package and deploy
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -28,33 +29,18 @@ jobs:
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
           cache: true
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-      - run: pnpm test
-      - run: bash scripts/verify-deploy.sh
-      - run: pnpm build
-      - run: pnpm verify:extension
-      - run: pnpm server:build
-      - run: pnpm verify:server
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: backend-${{ github.sha }}
-          path: browser-tabs-server.tar.gz
-          if-no-files-found: error
-          compression-level: 0
-
-  deploy:
-    needs: build
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: backend-${{ github.sha }}
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check backend
+        run: |
+          pnpm server:check
+          bash tests/deploy.sh
+      - name: Package backend
+        run: |
+          pnpm server:build
+          pnpm verify:server
       - name: Upload and deploy
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         env:
           SSH_HOST: ${{ vars.SSH_HOST }}
           SSH_PORT: ${{ vars.SSH_PORT || '22' }}
@@ -62,4 +48,37 @@ jobs:
           DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/opt/browser-tabs' }}
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
-        run: bash deploy/upload.sh
+        run: |
+          set -euo pipefail
+          : "${SSH_HOST:?Missing SSH_HOST}" "${SSH_USER:?Missing SSH_USER}"
+          : "${SSH_PRIVATE_KEY:?Missing SSH_PRIVATE_KEY}" "${SSH_KNOWN_HOSTS:?Missing SSH_KNOWN_HOSTS}"
+          [[ $SSH_HOST =~ ^[a-zA-Z0-9.:-]+$ && $SSH_USER =~ ^[a-z_][a-z0-9_-]*$ ]] || exit 1
+          [[ $SSH_PORT =~ ^[0-9]{1,5}$ ]] && (( 10#$SSH_PORT > 0 && 10#$SSH_PORT <= 65535 )) || exit 1
+          [[ $DEPLOY_PATH =~ ^/[a-zA-Z0-9_./-]+$ && $DEPLOY_PATH != / && $DEPLOY_PATH != *'/../'* && $DEPLOY_PATH != */.. ]] || exit 1
+
+          ssh_directory=$(mktemp -d "$RUNNER_TEMP/blank-backup-ssh.XXXXXX")
+          trap 'rm -f -- "$ssh_directory/key" "$ssh_directory/known_hosts" "$ssh_directory/config"; rmdir -- "$ssh_directory"' EXIT
+          umask 077
+          printf '%s\n' "$SSH_PRIVATE_KEY" | tr -d '\r' > "$ssh_directory/key"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" | tr -d '\r' > "$ssh_directory/known_hosts"
+          unset SSH_PRIVATE_KEY SSH_KNOWN_HOSTS
+          cat > "$ssh_directory/config" <<EOF
+          Host deployment
+            HostName $SSH_HOST
+            Port $SSH_PORT
+            User $SSH_USER
+            IdentityFile $ssh_directory/key
+            UserKnownHostsFile $ssh_directory/known_hosts
+            GlobalKnownHostsFile /dev/null
+            StrictHostKeyChecking yes
+            IdentitiesOnly yes
+            BatchMode yes
+            ConnectTimeout 15
+            ServerAliveInterval 15
+            ServerAliveCountMax 3
+          EOF
+
+          release_id="$GITHUB_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          ssh -F "$ssh_directory/config" deployment "mkdir -p -- '$DEPLOY_PATH/incoming'"
+          scp -F "$ssh_directory/config" browser-tabs-server.tar.gz "deployment:$DEPLOY_PATH/incoming/$release_id.tar.gz"
+          ssh -F "$ssh_directory/config" deployment "bash -s -- '$DEPLOY_PATH' '$release_id'" < deploy/deploy.sh

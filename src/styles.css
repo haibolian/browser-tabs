@@ -671,6 +671,24 @@ a:focus-visible {
   color: var(--primary-foreground) !important;
 }
 
+[data-sonner-toast].push-toast [data-content],
+[data-sonner-toast].push-toast [data-title] {
+  width: 100%;
+}
+[data-sonner-toast].push-toast [data-title] {
+  font-weight: 400;
+}
+.native-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  overscroll-behavior: contain;
+}
+.native-dialog::backdrop {
+  background: var(--overlay);
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;

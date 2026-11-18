@@ -12,6 +12,7 @@ import { GitHubOAuth, type GitHubConfig } from './github'
 import { Store } from './database'
 import { ApiError } from './errors'
 import type { BackupPolicy } from './backups'
+import { registerPushRoutes } from './push-routes'
 
 export function createApp(options: {
   databasePath: string
@@ -151,5 +152,6 @@ export function createApp(options: {
     store.deleteBackup(user.id, id)
     return reply.code(204).send()
   })
+  registerPushRoutes(app, store.push, (request) => authenticate(request).user.id)
   return app
 }

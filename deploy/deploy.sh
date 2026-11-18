@@ -2,12 +2,12 @@
 set -euo pipefail
 umask 022
 
-[[ $# == 2 ]] || { echo 'Usage: remote-deploy.sh DEPLOY_PATH RELEASE_ID' >&2; exit 1; }
-[[ $1 =~ ^/[a-zA-Z0-9_./-]+$ ]] || { echo 'DEPLOY_PATH must be an absolute path without spaces' >&2; exit 1; }
+[[ $# == 2 && $1 =~ ^/[a-zA-Z0-9_./-]+$ && $2 =~ ^[a-f0-9]{40}-[0-9]+-[0-9]+$ ]] || {
+  echo 'Usage: deploy.sh ABSOLUTE_DEPLOY_PATH COMMIT-RUN-ATTEMPT' >&2; exit 1;
+}
 deploy_path=$(realpath -m -- "$1")
 [[ $deploy_path != / ]] || { echo 'Cannot deploy into the filesystem root' >&2; exit 1; }
 release_id=$2
-[[ $release_id =~ ^[a-f0-9]{40}-[0-9]+-[0-9]+$ ]] || { echo 'Invalid release identifier' >&2; exit 1; }
 release="$deploy_path/releases/$release_id"
 archive="$deploy_path/incoming/$release_id.tar.gz"
 current="$deploy_path/current"
@@ -17,7 +17,7 @@ for command in node pnpm curl systemctl flock; do
 done
 node -e 'if (Number(process.versions.node.split(".")[0]) < 24) process.exit(1)'
 [[ $(systemctl show blank-backup --property=WorkingDirectory --value) == "$current" ]] || {
-  echo 'Initialize the service with deploy/setup-server.sh before deploying.' >&2
+  echo 'Initialize the service following docs/github-actions.md before deploying.' >&2
   exit 1
 }
 [[ -f $archive ]] || { echo 'Uploaded deployment package is missing' >&2; exit 1; }
@@ -30,7 +30,6 @@ mkdir -- "$release"
 tar -xzf "$archive" -C "$release"
 cd "$release"
 CI=true pnpm install --prod --frozen-lockfile
-node --check server-dist/index.mjs
 
 previous=''
 if [[ -L $current ]]; then

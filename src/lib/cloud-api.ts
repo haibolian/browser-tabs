@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { backupSchema, type Backup } from './backup'
 import { CLOUD_SERVER_URL } from './cloud-server'
+import { createdPushTokenSchema, pushMessageSchema, pushTokenSchema } from './push-contract'
 import {
   cloudBackupListSchema,
   cloudBackupSchema,
@@ -72,6 +73,7 @@ export class CloudApi {
     method = 'GET',
     body?: unknown,
     upload?: UploadRequest,
+    signal?: AbortSignal,
   ): Promise<unknown> {
     const response = await fetch(`${CLOUD_SERVER_URL}/api/v1${path}`, {
       method,
@@ -85,7 +87,7 @@ export class CloudApi {
         ...(upload?.deviceId ? { 'X-Backup-Device': upload.deviceId } : {}),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal: upload?.signal,
+      signal: upload?.signal ?? signal,
     })
     if (!response.ok) {
       if (!response.headers.get('content-type')?.includes('application/json'))
@@ -132,5 +134,27 @@ export class CloudApi {
 
   async deleteBackup(id: string) {
     await this.request(`/backups/${encodeURIComponent(id)}`, 'DELETE')
+  }
+
+  async listPushTokens() {
+    return z.array(pushTokenSchema).parse(await this.request('/push/tokens'))
+  }
+
+  async createPushToken(name: string) {
+    return createdPushTokenSchema.parse(await this.request('/push/tokens', 'POST', { name }))
+  }
+
+  async revokePushToken(id: string) {
+    await this.request(`/push/tokens/${encodeURIComponent(id)}`, 'DELETE')
+  }
+
+  async listPushMessages(signal?: AbortSignal) {
+    return z
+      .array(pushMessageSchema)
+      .parse(await this.request('/push/messages', 'GET', undefined, undefined, signal))
+  }
+
+  async readPushMessages(ids: string[], signal?: AbortSignal) {
+    await this.request('/push/messages/read', 'POST', { ids }, undefined, signal)
   }
 }

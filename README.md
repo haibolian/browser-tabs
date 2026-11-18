@@ -58,6 +58,12 @@ pnpm server:dev
 
 自动备份的合并窗口从该份备份首次创建时起计算，窗口内继续上传不会延长窗口。列表按最后更新时间排序。保存新内容后，服务器在同一事务内清理超出数量上限的最旧备份；写入或清理失败会整体回滚。启动服务时也会按当前上限清理已有超额历史。每条上传请求携带持久化的幂等标识；保留中的备份可识别旧请求重试，重试不会把已合并的新内容改回旧版本。同一标识提交不同内容返回 409；请求记录随对应备份的删除一起清理。
 
+### 任务结果推送
+
+在「设置 → 推送」生成专用令牌，复制 MCP 配置到 Codex 后，定时任务可调用 `send_result` 投递完整结果。新标签页右上角显示常驻堆叠通知，最多两行；关闭通知会标记已读，点击被省略的内容会打开全文弹窗并标记已读。已读状态跨设备同步，网络失败时保留本机待同步记录。
+
+推送令牌仅允许发送消息。接入方式、工具参数、接口和部署步骤见 [任务结果推送](docs/push-messages.md)。
+
 ### 创建 GitHub OAuth App
 
 1. 打开 [GitHub Developer settings → OAuth Apps](https://github.com/settings/developers)，点击 **New OAuth App**。个人 GitHub 账号即可创建。
@@ -104,7 +110,9 @@ pnpm server:start
 
 Debian 12 的安装、上传、systemd 常驻运行、Nginx HTTPS 和数据维护步骤见 [部署文档](docs/deploy-debian12.md)，配置模板位于 `deploy/`。
 
-GitHub Actions 自动部署的 Secrets、Variables 和服务器初始化步骤见 [自动部署文档](docs/github-actions.md)。PR 运行检查；推送到 `main` 后自动构建、通过 SSH 上传、在服务器安装生产依赖并切换版本。
+GitHub Actions 的一次性配置见 [自动部署文档](docs/github-actions.md)。推送到 `main` 后，同一个任务依次完成后端检查、打包、SSH 上传、服务器安装依赖和重启；启动失败时尝试恢复旧版。可在本机执行 `pnpm server:check` 检查后端。
+
+日常部署入口为 `.github/workflows/deploy.yml` 和 `deploy/deploy.sh`；服务器初始化命令放在部署文档中，部署及后端包验证脚本位于 `tests/`。
 
 接口前缀为 `/api/v1`，除健康检查和 GitHub OAuth 握手外使用 `Authorization: Bearer <token>`，不使用 Cookie。接口响应不允许缓存，错误返回非 2xx 状态和 `{ "error": "原因" }`。
 

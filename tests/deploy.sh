@@ -73,7 +73,7 @@ upload() {
 }
 
 deploy() {
-  bash "$repository/deploy/remote-deploy.sh" "$TEST_ROOT" "$1"
+  bash "$repository/deploy/deploy.sh" "$TEST_ROOT" "$1"
 }
 
 upload "$first"

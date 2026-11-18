@@ -7,12 +7,14 @@ import type { BackupUpload, CloudUser, GitHubIdentity } from '../src/lib/cloud-c
 import { ApiError } from './errors'
 import { migrateDatabase } from './migrations'
 import { BackupStore, defaultBackupPolicy, type BackupPolicy } from './backups'
+import { PushStore } from './push'
 
 type OAuthRequest = { returnUrl: string; codeChallenge: string }
 
 export class Store {
   private db: DatabaseSync
   private backups: BackupStore
+  readonly push: PushStore
 
   constructor(path: string, policy: BackupPolicy = defaultBackupPolicy) {
     if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true })
@@ -22,6 +24,7 @@ export class Store {
       migrateDatabase(this.db, path)
       this.backups = new BackupStore(this.db, policy)
       this.backups.applyRetention()
+      this.push = new PushStore(this.db)
     } catch (error) {
       this.db.close()
       throw error

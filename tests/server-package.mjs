@@ -1,3 +1,4 @@
+// Exercise the packaged backend with independently installed production dependencies.
 import assert from 'node:assert/strict'
 import { execFileSync, execSync, spawn } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
@@ -138,6 +139,88 @@ try {
   assert.equal(new URL(authorizationUrl).origin, 'https://github.com')
   assert.equal(new URL(authorizationUrl).searchParams.get('state'), state)
 
+  const sessionToken = randomBytes(32).toString('base64url')
+  const sessionHash = createHash('sha256').update(sessionToken).digest('hex')
+  const seed = new DatabaseSync(database)
+  try {
+    seed
+      .prepare('INSERT INTO users VALUES (?, ?, ?, ?)')
+      .run('release-user', '101', 'release-test', Date.now())
+    seed
+      .prepare('INSERT INTO sessions VALUES (?, ?, ?)')
+      .run(sessionHash, 'release-user', Date.now() + 60_000)
+  } finally {
+    seed.close()
+  }
+  const sessionHeaders = {
+    Authorization: `Bearer ${sessionToken}`,
+    'Content-Type': 'application/json',
+  }
+  const generated = await request('/api/v1/push/tokens', {
+    method: 'POST',
+    headers: sessionHeaders,
+    body: JSON.stringify({ name: 'Release verification' }),
+  })
+  assert.equal(generated.status, 201)
+  const pushToken = await generated.json()
+  const pushHeaders = {
+    Authorization: `Bearer ${pushToken.token}`,
+    'Content-Type': 'application/json',
+    Accept: 'application/json, text/event-stream',
+  }
+  const rpc = async (id, method, params) =>
+    request('/api/v1/mcp', {
+      method: 'POST',
+      headers: pushHeaders,
+      body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+    })
+  const initialized = await rpc(1, 'initialize', {
+    protocolVersion: '2025-11-25',
+    capabilities: {},
+    clientInfo: { name: 'release-verifier', version: '1.0.0' },
+  })
+  assert.equal(initialized.status, 200)
+  assert.equal((await initialized.json()).result.serverInfo.name, 'blank-push')
+  const tools = await rpc(2, 'tools/list', {})
+  assert.deepEqual(
+    (await tools.json()).result.tools.map((tool) => tool.name),
+    ['send_result'],
+  )
+  const toolArguments = {
+    title: '部署验证',
+    content: '验证完整消息和已读持久化。',
+    requestId: 'release-verification',
+  }
+  const delivered = await rpc(3, 'tools/call', { name: 'send_result', arguments: toolArguments })
+  assert.equal(delivered.status, 200)
+  assert.notEqual((await delivered.json()).result.isError, true)
+  const unread = await request('/api/v1/push/messages', { headers: sessionHeaders })
+  const messages = await unread.json()
+  assert.equal(messages.length, 1)
+  assert.equal(messages[0].content, toolArguments.content)
+  const read = await request('/api/v1/push/messages/read', {
+    method: 'POST',
+    headers: sessionHeaders,
+    body: JSON.stringify({ ids: [messages[0].id] }),
+  })
+  assert.equal(read.status, 204)
+  await rpc(4, 'tools/call', { name: 'send_result', arguments: toolArguments })
+  assert.deepEqual(
+    await (await request('/api/v1/push/messages', { headers: sessionHeaders })).json(),
+    [],
+  )
+  assert.equal((await request('/api/v1/backups', { headers: pushHeaders })).status, 401)
+  assert.equal(
+    (
+      await request(`/api/v1/push/tokens/${pushToken.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: sessionHeaders.Authorization },
+      })
+    ).status,
+    204,
+  )
+  assert.equal((await rpc(5, 'tools/list', {})).status, 401)
+
   await stop()
   const db = new DatabaseSync(database, { readOnly: true })
   try {
@@ -147,6 +230,14 @@ try {
   }
 
   baseUrl = await start()
+  assert.deepEqual(
+    await (await request('/api/v1/push/messages', { headers: sessionHeaders })).json(),
+    [],
+  )
+  assert.deepEqual(
+    await (await request('/api/v1/push/tokens', { headers: sessionHeaders })).json(),
+    [],
+  )
   const callback = await request(
     `/api/v1/auth/github/callback?state=${state}&error=access_denied`,
     {
@@ -158,7 +249,7 @@ try {
   assert.equal(`${redirect.origin}${redirect.pathname}`, returnUrl)
   assert.equal(new URLSearchParams(redirect.hash.slice(1)).get('github_error'), 'access_denied')
   console.log(
-    'Verified release package with freshly installed production dependencies: startup, HTTP, CORS, validation, OAuth state and SQLite persistence across restarts.',
+    'Verified release package with freshly installed production dependencies: startup, HTTP, CORS, validation, OAuth, MCP delivery, token revocation and read persistence across restarts.',
   )
 } catch (error) {
   console.error(logs)

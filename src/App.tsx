@@ -26,6 +26,7 @@ import { useTheme } from '@/hooks/use-theme'
 import { loadWallpaperImage } from '@/lib/storage'
 import { cn } from '@/lib/utils'
 import { iconAppearanceStyle } from '@/lib/icon-appearance'
+import { PushNotifications } from '@/components/push-notifications'
 
 export class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null }
@@ -285,6 +286,7 @@ function Desktop({
         toastOptions={{ className: 'blank-toast', duration: 4000 }}
         closeButton
       />
+      <PushNotifications connection={cloudConnection} theme={resolvedTheme} />
     </MotionConfig>
   )
 }

@@ -29,6 +29,7 @@ import type { ImportedBackup } from '@/lib/infinity-backup'
 import { CloudBackupPanel } from '@/components/cloud-backup-panel'
 import type { CloudConnection } from '@/lib/cloud-api'
 import type { CloudUpload } from '@/hooks/use-cloud-upload'
+import { PushSettings } from '@/components/push-settings'
 
 export function SettingsDialog({
   open,
@@ -129,6 +130,9 @@ export function SettingsDialog({
               </TabsTrigger>
               <TabsTrigger className="flex-1" value="data">
                 数据备份
+              </TabsTrigger>
+              <TabsTrigger className="flex-1" value="push">
+                推送
               </TabsTrigger>
             </TabsList>
             <TabsContent value="general">
@@ -258,6 +262,12 @@ export function SettingsDialog({
                   cloudUpload={cloudUpload}
                 />
               </div>
+            </TabsContent>
+            <TabsContent value="push">
+              <PushSettings
+                key={cloudConnection?.session.user.githubId ?? 'signed-out'}
+                connection={cloudConnection}
+              />
             </TabsContent>
           </Tabs>
         </DialogContent>
